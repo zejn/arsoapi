@@ -8,9 +8,13 @@ class Command(BaseCommand):
 		import datetime
 		
 		now = datetime.datetime.now()
-		ft = datetime.datetime(now.year, now.month, now.day)
-		if now.hour > 17:
-			ft = ft.replace(hour=12)
+		hrs = '0000'
+		if  12 < now.hour <= 23:
+			hrs = '1200'
+		if 0 <= now.hour <= 4:
+			hrs = '1200'
+			now = now - datetime.timedelta(1)
+		
 		for n in range(6,73,3):
 			img_data, last_modified = fetch_aladin(n)
 			a = Aladin(timestamp=last_modified, forecast_time=ft, timedelta=n, picdata=img_data.encode('base64'))

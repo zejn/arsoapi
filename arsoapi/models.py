@@ -107,15 +107,8 @@ class Aladin(models.Model):
 def fetch_radar():
 	return fetch(URL_VREME_RADAR)
 
-def fetch_aladin(n):
-	now = datetime.datetime.now()
-	hrs = '0000'
-	if  12 < now.hour <= 23:
-		hrs = '1200'
-	if 0 <= now.hour <= 4:
-		hrs = '1200'
-		now = now - datetime.timedelta(1)
-	
+def fetch_aladin(ft, n):
+
 	assert n % 3 == 0
 	return fetch(URL_VREME_ALADIN % (now.strftime('%Y%m%d'), hrs, n))
 
@@ -650,7 +643,7 @@ class GeocodedAladin:
 		
 		forecast = []
 		for n, p in pixel:
-			
+			print self.forecast_time[n]
 			ft = self.forecast_time[n] + datetime.timedelta(hours=n)
 			ft = ft.replace(tzinfo=pytz.UTC)
 			ft = ft.astimezone(pytz.timezone('Europe/Ljubljana'))
