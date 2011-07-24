@@ -110,7 +110,7 @@ def fetch_radar():
 def fetch_aladin(ft, n):
 
 	assert n % 3 == 0
-	return fetch(URL_VREME_ALADIN % (now.strftime('%Y%m%d'), hrs, n))
+	return fetch(URL_VREME_ALADIN % (ft.strftime('%Y%m%d'), ft.strftime('%H%M'), n))
 
 RADAR_CRTE = (96,96,96)
 WHITE = (255,255,255)
