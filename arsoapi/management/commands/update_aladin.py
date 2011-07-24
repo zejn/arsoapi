@@ -15,4 +15,5 @@ class Command(BaseCommand):
 			img_data, last_modified = fetch_aladin(n)
 			a = Aladin(timestamp=last_modified, forecast_time=ft, timedelta=n, picdata=img_data.encode('base64'))
 			a.save()
+			a.process()
 		

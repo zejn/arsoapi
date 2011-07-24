@@ -10,6 +10,8 @@ from itertools import chain
 
 from django.db import models
 from django.conf import settings
+from django.core.files.base import ContentFile
+
 from arsoapi.util import Counter, fetch
 from arsoapi.laplacian import laplacian
 
@@ -41,6 +43,7 @@ class RadarPadavin(models.Model):
 	timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 	last_modified = models.DateTimeField(db_index=True)
 	picdata = models.TextField()
+	processed = models.FileField(upload_to='processed', null=True, blank=True)
 	
 	class Meta:
 		ordering = ('-timestamp',)
@@ -55,12 +58,22 @@ class RadarPadavin(models.Model):
 			self.picdata = s.getvalue().encode('base64')
 		return fget, fset
 	pic = property(*pic())
+	
+	def image_name(self):
+		return 'radar_%s.tif' % (self.last_modified.strftime('%Y%m%d-%H%M%S'),)
+	
+	def process(self):
+		filtered = filter_radar(self.pic)
+		geotiff = annotate_geo_radar(filtered)
+		self.processed.save(name=self.image_name(), content=ContentFile(geotiff))
+		self.save()
 
 class Aladin(models.Model):
 	timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 	forecast_time = models.DateTimeField(db_index=True)
 	timedelta = models.IntegerField()
 	picdata = models.TextField()
+	processed = models.FileField(upload_to='processed', null=True, blank=True)
 	
 	class Meta:
 		ordering = ('-forecast_time', '-timedelta')
@@ -75,6 +88,16 @@ class Aladin(models.Model):
 			self.picdata = s.getvalue().encode('base64')
 		return fget, fset
 	pic = property(*pic())
+	
+	def image_name(self):
+		return 'aladin_%s_%s.tif' % (self.forecast_time.strftime('%Y%m%d-%H%M'), self.timedelta)
+	
+	def process(self):
+		filtered = filter_aladin(self.pic)
+		geotiff = annotate_geo_aladin(filtered)
+		self.processed.save(name=self.image_name(), content=ContentFile(geotiff))
+		self.save()
+
 
 
 ###############################
@@ -87,8 +110,12 @@ def fetch_radar():
 def fetch_aladin(n):
 	now = datetime.datetime.now()
 	hrs = '0000'
-	if now.hour > 17:
+	if  12 < now.hour <= 23:
 		hrs = '1200'
+	if 0 <= now.hour <= 4:
+		hrs = '1200'
+		now = now - datetime.timedelta(1)
+	
 	assert n % 3 == 0
 	return fetch(URL_VREME_ALADIN % (now.strftime('%Y%m%d'), hrs, n))
 
@@ -452,10 +479,13 @@ class GeocodedRadar:
 		self.bands = {}
 		self.last_modified = None
 	
+	def refresh(self):
+		r = RadarPadavin.objects.all()[0]
+		if self.last_modified != r.last_modified:
+			self.load_from_model(r)
+	
 	def load_from_model(self, instance):
-		filtered = filter_radar(instance.pic)
-		geotiff = annotate_geo_radar(filtered)
-		self.load_from_string(geotiff)
+		self.load_from_string(instance.processed.read())
 		self.last_modified = instance.last_modified
 	
 	def load_from_string(self, data):
@@ -515,17 +545,21 @@ class GeocodedAladin:
 		self.bands = {}
 		self.tmpfiles = {}
 		self.forecast_time = {}
-		self.last_modified = None
+	
+	def refresh(self):
+		a = Aladin.objects.all()[0]
+		ft = self.forecast_time.get(6, datetime.datetime.now() - datetime.timedelta(1))
+		timediff = datetime.datetime.now() - ft
+		if timediff > datetime.timedelta(hours=12):
+			self.load_from_models(Aladin.objects.filter(forecast_time=a.forecast_time))
 	
 	def load_from_models(self, instances):
 		self.tmpfiles = {}
 		self.clean()
 		for i in instances:
 			print 'ALADIN Loading :', i.timedelta
-			filtered = filter_aladin(i.pic)
-			geotiff = annotate_geo_aladin(filtered)
-			self.load_from_string(geotiff, i.timedelta, i.forecast_time)
-			self.last_modified = i.timestamp
+			self.load_from_string(i.processed.read(), i.timedelta, i.forecast_time)
+			self.forecast_time[i.timedelta] = i.forecast_time
 	
 	def load_from_string(self, data, n, ft):
 		self.tmpfiles[n] = None # clear reference
@@ -586,7 +620,6 @@ class GeocodedAladin:
 				c[k] += 1
 				if p == (xOffset, yOffset):
 					c[k] += 5
-			print c.most_common()[0]
 			resp.append((n, c.most_common()[0][0]))
 			#resp.append((n, tuple((int(b[xOffset,yOffset]) for b in self.bands[n].itervalues()))))
 		
@@ -605,9 +638,7 @@ class GeocodedAladin:
 			return p
 	
 	def _get_value(self, pixel):
-		print 'clouds',
 		clouds = self.CLOUDS.get(self._nearest_color(pixel, self.CLOUDS), 0)
-		print 'rain',
 		rain = self.RAIN.get(self._nearest_color(pixel, self.RAIN), 0)
 		return {
 			'clouds': clouds,

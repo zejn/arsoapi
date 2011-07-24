@@ -11,8 +11,8 @@ from arsoapi.models import (
 	Aladin, filter_aladin, annotate_geo_aladin, GeocodedAladin
 	)
 
-geocoded_radar = None
-geocoded_aladin = None
+geocoded_radar = GeocodedRadar()
+geocoded_aladin = GeocodedAladin()
 
 def _dumps(s):
 	return simplejson.dumps(s, use_decimal=True, ensure_ascii=True)
@@ -90,10 +90,8 @@ def image(request, what, stage, offset):
 
 @jsonresponse
 def report(request):
-	if geocoded_radar is None:
-		radar_full()
-	if geocoded_aladin is None:
-		aladin_full()
+	geocoded_radar.refresh()
+	geocoded_aladin.refresh()
 	
 	try:
 		lat = float(request.GET.get('lat'))
@@ -125,7 +123,7 @@ def report(request):
 				'rain_level': rain_level,
 			},
 			'forecast': {
-				'updated': _datetime2timestamp(geocoded_aladin.last_modified),
+				'updated': _datetime2timestamp(geocoded_aladin.forecast_time.get(6, None)),
 				'x': posA[0],
 				'y': posA[1],
 				'data': forecast,
