@@ -8,10 +8,11 @@ import Image
 import simplejson
 from arsoapi.models import (
 	RadarPadavin, filter_radar, annotate_geo_radar, convert_geotiff_to_png, GeocodedRadar,
-	Aladin, filter_aladin, annotate_geo_aladin, GeocodedAladin
+	Aladin, filter_aladin, annotate_geo_aladin, GeocodedAladin, GeocodedToca
 	)
 
 geocoded_radar = GeocodedRadar()
+geocoded_toca = GeocodedToca()
 geocoded_aladin = GeocodedAladin()
 
 def _dumps(s):
@@ -20,28 +21,11 @@ def _dumps(s):
 def _datetime2timestamp(dt):
 	return int(time.mktime(dt.timetuple()))
 
-
 def jsonresponse(func):
 	def _inner(*args, **kwargs):
 		jsondata = func(*args, **kwargs)
 		return HttpResponse(_dumps(jsondata), mimetype='application/json')
 	return _inner
-
-def radar_full():
-	global geocoded_radar
-	
-	if geocoded_radar is None:
-		geocoded_radar = GeocodedRadar()
-	r = RadarPadavin.objects.all()[0]
-	geocoded_radar.load_from_model(r)
-
-def aladin_full():
-	global geocoded_aladin
-	if geocoded_aladin is None:
-		geocoded_aladin = GeocodedAladin()
-	lastdate = Aladin.objects.all()[0]
-	a = Aladin.objects.filter(forecast_time=lastdate.forecast_time)
-	geocoded_aladin.load_from_models(a)
 
 def get_radar(stage):
 	r = RadarPadavin.objects.all()[0]
@@ -88,9 +72,16 @@ def image(request, what, stage, offset):
 		data = get_aladin(stage, offset)
 	return HttpResponse(data, mimetype='image/png')
 
+def tz2utc_diff():
+	now = datetime.datetime.now().replace(second=0, microsecond=0)
+	utcnow = datetime.datetime.utcnow().replace(second=0, microsecond=0)
+	
+	return (now - utcnow)
+
 @jsonresponse
 def report(request):
 	geocoded_radar.refresh()
+	geocoded_toca.refresh()
 	geocoded_aladin.refresh()
 	
 	try:
@@ -109,18 +100,28 @@ def report(request):
 			}
 	else:
 		posR, rain_level = geocoded_radar.get_rain_at_coords(lat, lon)
+		posT, toca_level = geocoded_toca.get_toca_at_coords(lat, lon)
 		posA, forecast = geocoded_aladin.get_forecast_at_coords(lat, lon)
+		
+		utc_diff = tz2utc_diff()
 		
 		resp = {
 			'status': 'ok',
 			'lat': request.GET.get('lat'),
 			'lon': request.GET.get('lon'),
 			'radar': {
-				'updated': _datetime2timestamp(geocoded_radar.last_modified),
-				'updated_text': geocoded_radar.last_modified.strftime('%Y-%m-%d %H:%M'),
+				'updated': _datetime2timestamp(geocoded_radar.last_modified + utc_diff),
+				'updated_text': (geocoded_radar.last_modified + utc_diff).strftime('%Y-%m-%d %H:%M'),
 				'x': posR[0],
 				'y': posR[1],
 				'rain_level': rain_level,
+			},
+			'hailprob': {
+				'updated': _datetime2timestamp(geocoded_toca.last_modified + utc_diff),
+				'updated_text': (geocoded_toca.last_modified + utc_diff).strftime('%Y-%m-%d %H:%M'),
+				'x': posT[0],
+				'y': posT[1],
+				'hail_level': toca_level,
 			},
 			'forecast': {
 				'updated': _datetime2timestamp(geocoded_aladin.forecast_time.get(6, None)),

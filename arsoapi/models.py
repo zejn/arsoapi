@@ -19,15 +19,18 @@ from osgeo import gdal
 import osgeo.gdalconst as gdalc
 
 URL_VREME_RADAR = 'http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif'
-URL_VREME_ALADIN = 'http://www.arso.gov.si/vreme/napovedi%%20in%%20podatki/aladin/AW00_oblpad_%.3d.png'
+URL_VREME_TOCA  = 'http://www.meteo.si/uploads/probase/www/warning/graphic/warning_%s_hp_si.jpg'
+#URL_VREME_ALADIN = 'http://www.arso.gov.si/vreme/napovedi%%20in%%20podatki/aladin/AW00_oblpad_%.3d.png'
 URL_VREME_ALADIN = 'http://meteo.arso.gov.si/uploads/probase/www/model/aladin/field/as_%s-%s_tcc-rr_si-neighbours_%.3d.png'
 
 GDAL_TRANSLATE = '/usr/bin/gdal_translate'
 GDAL_WARP = '/usr/bin/gdalwarp'
 IMAGEMAGICK_CONVERT = '/usr/bin/convert'
 
-MASK_FILE = os.path.join(os.path.dirname(__file__), 'mask.png')
-MEJE_FILE = os.path.join(os.path.dirname(__file__), 'meje.png')
+TOCA_MASK_FILE = os.path.join(os.path.dirname(__file__), 'toca_mask.png')
+TOCA_MEJE_FILE = os.path.join(os.path.dirname(__file__), 'toca_meje.png')
+ALADIN_MASK_FILE = os.path.join(os.path.dirname(__file__), 'mask.png')
+ALADIN_MEJE_FILE = os.path.join(os.path.dirname(__file__), 'meje.png')
 
 # init
 gdal.AllRegister()
@@ -43,7 +46,7 @@ class RadarPadavin(models.Model):
 	timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 	last_modified = models.DateTimeField(db_index=True)
 	picdata = models.TextField()
-	processed = models.FileField(upload_to='processed', null=True, blank=True)
+	processed = models.FileField(upload_to='processed/radar', null=True, blank=True)
 	
 	class Meta:
 		ordering = ('-timestamp',)
@@ -68,12 +71,41 @@ class RadarPadavin(models.Model):
 		self.processed.save(name=self.image_name(), content=ContentFile(geotiff))
 		self.save()
 
+class Toca(models.Model):
+	timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+	last_modified = models.DateTimeField(db_index=True)
+	picdata = models.TextField()
+	processed = models.FileField(upload_to='processed/toca')
+	
+	class Meta:
+		ordering = ('-timestamp',)
+	
+	def pic():
+		def fget(self):
+			if self.picdata:
+				return Image.open(StringIO(self.picdata.decode('base64')))
+		def fset(self, value):
+			s = StringIO()
+			value.save(s)
+			self.picdata = s.getvalue().encode('base64')
+		return fget, fset
+	pic = property(*pic())
+	
+	def image_name(self):
+		return 'toca_%s.tif' % (self.last_modified.strftime('%Y%m%d-%H%M%S'),)
+	
+	def process(self):
+		filtered = filter_toca(self.pic)
+		geotiff = annotate_geo_toca(filtered)
+		self.processed.save(name=self.image_name(), content=ContentFile(geotiff))
+		self.save()
+
 class Aladin(models.Model):
 	timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 	forecast_time = models.DateTimeField(db_index=True)
 	timedelta = models.IntegerField()
 	picdata = models.TextField()
-	processed = models.FileField(upload_to='processed', null=True, blank=True)
+	processed = models.FileField(upload_to='processed/aladin', null=True, blank=True)
 	
 	class Meta:
 		ordering = ('-forecast_time', '-timedelta')
@@ -106,6 +138,15 @@ class Aladin(models.Model):
 
 def fetch_radar():
 	return fetch(URL_VREME_RADAR)
+
+def fetch_toca():
+	now = datetime.datetime.utcnow()
+	now = now - datetime.timedelta(seconds=120)
+	now = now.replace(minute=now.minute - now.minute % 10)
+	
+	url = URL_VREME_TOCA % now.strftime('%Y%m%d-%H%M')
+	print url
+	return fetch(url)
 
 def fetch_aladin(ft, n):
 
@@ -144,6 +185,75 @@ def filter_radar(src_img):
 	
 	return im
 
+TOCA_LEVELS = {
+	(255, 238, 89): 1,
+	(255, 179, 75): 2,
+	(255, 97, 72): 3,
+}
+
+def _imageop_divide(im, mask):
+	"useful for removing terrain from pictures"
+	pixels = im.load()
+	mask_pix = mask.load()
+	
+	for i in xrange(im.size[0]):
+		for j in xrange(im.size[1]):
+			p = pixels[i,j]
+			m = mask_pix[i,j]
+			pixels[i,j] = (
+				256*p[0] / (m[0]+1),
+				256*p[1] / (m[1]+1),
+				256*p[2] / (m[2]+1),
+				)
+
+def _nearest_color(p, palette, threshold):
+	dists = []
+	if p == (255,255,255):
+		return p
+	for c in palette:
+		d = sum([abs(a - b) for a, b in zip(p, c)])
+		dists.append((d, c))
+	mindist = sorted(dists)[0][0]
+	all_mindist = [i for i in dists if i[0] == mindist]
+	if len(all_mindist) == 1 and all_mindist[0][0] < threshold:
+		return all_mindist[0][1]
+	else:
+		return p
+
+def filter_toca(src_img):
+	im = src_img.convert('RGB')
+	pixels = im.load()
+	
+	mask = Image.open(TOCA_MASK_FILE).convert('RGB')
+	_imageop_divide(im, mask)
+	
+	levels = {
+		(255,255,255): 0,
+		}
+	levels.update(TOCA_LEVELS)
+	for i in xrange(im.size[0]):
+		for j in xrange(im.size[1]):
+			p = pixels[i,j]
+			p2 = _nearest_color(p, levels, 80) # 80 here is pure empirical magic
+			if p2 != p:
+				pixels[i,j] = p2
+	
+	def _surroundings(i, j):
+		for a in xrange(i-1, i+2):
+			for b in xrange(j-1, j+2):
+				yield a, b
+	
+	for i in range(1, im.size[0]-1):
+		for j in range(1, im.size[1]-1):
+			if pixels[i,j] not in levels: # pixel needs repairing
+				c = Counter()
+				for coord in (pt for pt in _surroundings(i, j) if pixels[pt] in levels):
+					c[pixels[coord]] += 1
+				elected = c.most_common()[0][0]
+				pixels[i,j] = elected
+	
+	return im
+
 ALADIN_CRTE = (123,123,123)
 ALADIN_BACKGROUND = (241, 241, 241)
 ALADIN_MORJE = (252, 252, 252)
@@ -162,8 +272,8 @@ ALADIN_PADAVINE = {
 	(228, 255, 151): 5,
 	(189, 245, 149): 10,
 	(171, 228, 150): 20,
-	(134, 207, 131):  30,
-	(114, 189, 126):   40,
+	(134, 207, 131): 30,
+	(114, 189, 126): 40,
 	# unverified colors below
 	(18, 115, 55):   50,
 	(18, 158, 104):  60,
@@ -180,28 +290,18 @@ def filter_aladin(src_img):
 	pixels = im.load()
 	cc = Counter()
 	
-	mask = Image.open(MASK_FILE).convert('RGB')
+	mask = Image.open(ALADIN_MASK_FILE).convert('RGB')
 	mask_pix = mask.load()
 	
-	# step 1: remove terrain
-	for i in range(im.size[0]):
-		for j in range(im.size[1]):
-			p = pixels[i,j]
-			m = mask_pix[i,j]
-			pixels[i,j] = (
-				256*p[0] / (m[0]+1),
-				256*p[1] / (m[1]+1),
-				256*p[2] / (m[2]+1),
-				)
+	_imageop_divide(im, mask)
 	
 	def _surroundings(i, j):
 		for a in xrange(i-2, i+3):
 			for b in xrange(j-2, j+3):
 				yield a, b
-		
 	
 	# step 2: fix artefacts from previous step
-	meje = Image.open(MEJE_FILE)
+	meje = Image.open(ALADIN_MEJE_FILE)
 	meje_pix = meje.load()
 	
 	for i in range(2, im.size[0]-2):
@@ -425,6 +525,30 @@ def annotate_geo_radar(img):
 	processed = dst.read()
 	return processed
 
+def annotate_geo_toca(img):
+	print 'ANN toca: Annotating'
+	src = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='toca1_', suffix='.tif')
+	tmp = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='toca3_', suffix='.tif')
+	dst = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='toca3_', suffix='.tif')
+	
+	img.save(src.name, 'tiff')
+	src.flush()
+	
+	print 'ANN toca: gdal translate'
+	cmd = '-gcp 94 131 401712 154018 -gcp 542 97 589532 168167 -gcp 398 408 530526 38229 -a_srs EPSG:3787'.split(' ')
+	p = subprocess.Popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
+	p.wait()
+	
+	print 'ANN toca: gdal warp'
+	p = subprocess.Popen([GDAL_WARP] + '-s_srs EPSG:3787 -t_srs EPSG:4326'.split(' ') + [tmp.name, dst.name])
+	p.wait()
+	
+	print 'ANN toca: done'
+	dst.seek(0)
+	processed = dst.read()
+	return processed
+
+
 def annotate_geo_aladin(img):
 	print 'ANN aladin: Annotating'
 	src = tempfile.NamedTemporaryFile(dir=settings.TEMPORARY_DIR, prefix='aladin1_', suffix='.tif')
@@ -527,6 +651,70 @@ class GeocodedRadar:
 	def get_rain_at_coords(self, lat, lng):
 		position, pixel = self.get_pixel_at_coords(lat, lng)
 		return position, self.RAIN_LEVEL[pixel]
+	
+
+class GeocodedToca:
+	TOCA_LEVELS = TOCA_LEVELS
+	
+	def __init__(self):
+		self.bands = {}
+		self.last_modified = None
+	
+	def refresh(self):
+		t = Toca.objects.all()[0]
+		if self.last_modified != t.last_modified:
+			self.load_from_model(t)
+	
+	def load_from_model(self, instance):
+		self.load_from_string(instance.processed.read())
+		self.last_modified = instance.last_modified
+	
+	def load_from_string(self, data):
+		self.tmpfile = None # clear reference
+		self.tmpfile = tempfile.NamedTemporaryFile(dir=settings.TEMPORARY_DIR, prefix='toca_served_', suffix='.tif')
+		self.tmpfile.write(data)
+		self.tmpfile.flush()
+		self.load(self.tmpfile.name)
+	
+	def __del__(self):
+		self.clean()
+	
+	def clean(self):
+		for b in self.bands.keys():
+			del self.bands[b]
+		self.transform = None
+		self.rows = self.cols = None
+		self.ds = None
+	
+	def load(self, filename):
+		self.clean()
+		
+		self.ds = gdal.Open(filename, gdalc.GA_ReadOnly)
+		if self.ds is None:
+			raise GeoDatasourceError('No datasource file found')
+		
+		self.rows = self.ds.RasterYSize
+		self.cols = self.ds.RasterXSize
+		self.transform = self.ds.GetGeoTransform()
+		
+		for i in range(self.ds.RasterCount):
+			band = self.ds.GetRasterBand(i+1)
+			self.bands[i+1] = band.ReadAsArray(0, 0, self.cols, self.rows)
+	
+	def get_pixel_at_coords(self, lat, lng):
+		yOrigin = self.transform[0]
+		xOrigin = self.transform[3]
+		pixelWidth = self.transform[1]
+		pixelHeight = self.transform[5]
+		
+		xOffset = abs(int((lat-xOrigin) / pixelWidth)) # XXX remove abs
+		yOffset = abs(int((lng-yOrigin) / pixelHeight))
+		
+		return (xOffset, yOffset), tuple((int(b[xOffset,yOffset]) for b in self.bands.itervalues()))
+	
+	def get_toca_at_coords(self, lat, lng):
+		position, pixel = self.get_pixel_at_coords(lat, lng)
+		return position, self.TOCA_LEVELS.get(pixel, 0)
 	
 
 class GeocodedAladin:
@@ -643,7 +831,6 @@ class GeocodedAladin:
 		
 		forecast = []
 		for n, p in pixel:
-			print self.forecast_time[n]
 			ft = self.forecast_time[n] + datetime.timedelta(hours=n)
 			ft = ft.replace(tzinfo=pytz.UTC)
 			ft = ft.astimezone(pytz.timezone('Europe/Ljubljana'))
