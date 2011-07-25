@@ -732,8 +732,7 @@ class GeocodedAladin:
 	def refresh(self):
 		ft = self.forecast_time.get(6, datetime.datetime.now() - datetime.timedelta(1))
 		a = Aladin.objects.all()[0]
-		#if a.forecast_time > ft:
-		if True:
+		if a.forecast_time > ft:
 			self.load_from_models(Aladin.objects.filter(forecast_time=a.forecast_time))
 	
 	def load_from_models(self, instances):
