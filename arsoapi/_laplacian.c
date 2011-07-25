@@ -122,12 +122,9 @@ laplace (int width, int height, unsigned char *srcPR, unsigned char *destPR)
   unsigned char      *cur_row, *cr;
   unsigned char      *next_row, *nr;
   unsigned char      *tmp;
-  unsigned char *storelocation;
   int         row, col;
   int         minval, maxval;
-  int i;
 
-  dprint("laplace starting");
   /* image area */
 
   /* Get the size of the input image. (This will/must be the same
@@ -136,7 +133,6 @@ laplace (int width, int height, unsigned char *srcPR, unsigned char *destPR)
   bytes  = 3;
 
   /*  allocate row buffers  */
-  dprint("mallocing");
   prev_row = malloc((width + 2) * bytes);
   cur_row  = malloc((width + 2) * bytes);
   next_row = malloc((width + 2) * bytes);
@@ -146,16 +142,8 @@ laplace (int width, int height, unsigned char *srcPR, unsigned char *destPR)
   cr = cur_row + bytes;
   nr = next_row + bytes;
 
-  dprint("preparing rows");
   laplace_prepare_row(srcPR, pr, 0, -1, width, height);
   laplace_prepare_row(srcPR, cr, 0, 0, width, height);
-
-  dprint("height=%d", height);
-  dprint("width=%d", width);
-
-  for (i=0;i<width*height*3;i=i+3)
-    dprint("(%d, %d) = (%d, %d, %d)", i/bytes/width, i/bytes%width, srcPR[i], srcPR[i+1], srcPR[i+2]);
-
 
   /*  loop through the rows, applying the laplace convolution  */
   for (row = 0; row < height; row++)
@@ -163,11 +151,6 @@ laplace (int width, int height, unsigned char *srcPR, unsigned char *destPR)
       /*  prepare the next row  */
       laplace_prepare_row (srcPR, nr, 0, row + 1, width, height);
       // dprint("nr %d %d %d", nr[0], nr[1], nr[2]);
-      if (col == 0 && row == 0) {
-	for (i=0;i<width*3;i=i+3)
-	  dprint("(%d, %d) = (%d, %d, %d)", i/3/width, i/3%width, nr[i], nr[i+1], nr[i+2]);
-	
-      }
 
       d = dest;
 
@@ -175,14 +158,8 @@ laplace (int width, int height, unsigned char *srcPR, unsigned char *destPR)
         {
           minmax (pr[col], cr[col - bytes], cr[col], cr[col + bytes],
                 nr[col], &minval, &maxval); /* four-neighbourhood */
-	  if (col == 0 && row == 0) {
-	    dprint("00 %d %d %d %d %d", pr[col], cr[col - bytes], cr[col], cr[col + bytes], nr[col]);
-	    dprint("00 min %d max %d", minval, maxval);
-	  }
 
           gradient = (0.5 * MAX ((maxval - cr [col]), (cr[col]- minval)));
-	  if (col == 0 && row == 0)
-	    dprint("grad %d", gradient);
 
           *d++ = (((  pr[col - bytes] + pr[col]       + pr[col + bytes] +
                       cr[col - bytes] - (8 * cr[col]) + cr[col + bytes] +
@@ -190,9 +167,6 @@ laplace (int width, int height, unsigned char *srcPR, unsigned char *destPR)
                     gradient : (128 + gradient));
 
       /*  store the dest  */
-      if (col == 0 && row == 0) {
-	dprint("FML %d %d %d", dest[0], dest[1], dest[2]);
-      }
         }
       memcpy(destPR + width*bytes*row, dest, width*bytes);
 
@@ -207,15 +181,11 @@ laplace (int width, int height, unsigned char *srcPR, unsigned char *destPR)
   /* now clean up: leave only edges, but keep gradient value */
 
   memcpy(srcPR, destPR, width*height*bytes);
-  dprint("middle");
-  for (i=0;i<width*height*3;i=i+3)
-    dprint("(%d, %d) = (%d, %d, %d)", i/3/width, i/3%width, srcPR[i], srcPR[i+1], srcPR[i+2]);
 
   pr = prev_row + bytes;
   cr = cur_row + bytes;
   nr = next_row + bytes;
 
-  dprint("preparing rows 2");
   laplace_prepare_row (srcPR, pr, 0, -1, width, height);
   laplace_prepare_row (srcPR, cr, 0, 0, width, height);
 
@@ -239,16 +209,15 @@ laplace (int width, int height, unsigned char *srcPR, unsigned char *destPR)
                        BLACK_REGION (nr[col])         ||
                        BLACK_REGION (nr[col + bytes]))) ?
                      ((current >= 128) ? (current - 128) : current) : 0);
-          //dprint("cur %d %d %d", row, col / bytes, current);
 
           *d++ = current;
-	  if (col % bytes == 2) {
-	    if (*(d-1) < 15 && *(d-2) < 15 && *(d-3) < 15) {
-	      *(d-1) = 255;
-	      *(d-2) = 255;
-	      *(d-3) = 255;
-	    }
-	  }
+          if (col % bytes == 2) {
+            if (*(d-1) < 15 && *(d-2) < 15 && *(d-3) < 15) {
+              *(d-1) = 255;
+              *(d-2) = 255;
+              *(d-3) = 255;
+            }
+          }
         }
 
       /*  store the dest  */
@@ -263,16 +232,11 @@ laplace (int width, int height, unsigned char *srcPR, unsigned char *destPR)
     }
 
   /*  update the laplaced region  */
-  // gimp_drawable_flush (drawable);
-  // gimp_drawable_merge_shadow (drawable->drawable_id, TRUE);
 
   free (prev_row);
   free (cur_row);
   free (next_row);
   free (dest);
-  //dprint("End");
-  //for (i=0;i<width*height*3;i=i+3)
-  //  dprint("(%d, %d) = (%d, %d, %d)", i/3/width, i/3%width, destPR[i], destPR[i+1], destPR[i+2]);
 }
 
 
@@ -284,35 +248,32 @@ laplace (int width, int height, unsigned char *srcPR, unsigned char *destPR)
 PyObject * ppm_laplacian(PyObject *self, PyObject * args)
 {
 	int width, height;
-	unsigned char * data;
+	char *buffer;
+	unsigned char *data;
 	unsigned char *srcPR, *destPR;
 	Py_ssize_t datasize;
 	PyObject *py_data, *result;
 	
 	dprint("Starting");
-	//if (!PyArg_ParseTuple(args, "(ii)S", &width, &height, &py_data))
 	if (!PyArg_ParseTuple(args, "(ii)S", &width, &height, &py_data))
 		return NULL;
 	dprint("Parsing data");
-	PyString_AsStringAndSize(py_data, &data, &datasize);
+	PyString_AsStringAndSize(py_data, &buffer, &datasize);
+	data = (unsigned char *)(buffer);
 	
 	dprint("width=%d", width);
 	dprint("height=%d", height);
 	dprint("datasize=%d", datasize);
 	if (width*height*3 != datasize) {
 		PyErr_SetString(PyExc_ValueError, "data size does not match 24bit");
-		return -1;
+		return NULL;
 	}
 	
 	destPR = malloc(datasize);
 	srcPR = malloc(datasize);
-	//dprint("first three: %d %d %d", data[0], data[1], data[2]);
 	memcpy(srcPR, data, datasize);
-	//dprint("first three: %d %d %d", srcPR[0], srcPR[1], srcPR[2]);
 	
 	laplace(width, height, srcPR, destPR);
-	
-	//free(srcPR);
 	
 	result = Py_BuildValue("s#", destPR, datasize);
 	return result;
@@ -354,7 +315,6 @@ static PyMethodDef _functions[] = {
 
 PyMODINIT_FUNC init_laplacian(void)
 {
-	PyObject * m;
-	m = Py_InitModule3("_laplacian", _functions, "Second degree Laplacian edge detection accelerator module.");
+	Py_InitModule3("_laplacian", _functions, "Second degree Laplacian edge detection accelerator module.");
 
 }
