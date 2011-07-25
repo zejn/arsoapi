@@ -34,6 +34,7 @@ ALADIN_MEJE_FILE = os.path.join(os.path.dirname(__file__), 'meje.png')
 
 # init
 gdal.AllRegister()
+print 'Gdal version', gdal.VersionInfo()
 
 class GeoDatasourceError(Exception): pass
 
@@ -109,6 +110,7 @@ class Aladin(models.Model):
 	
 	class Meta:
 		ordering = ('-forecast_time', '-timedelta')
+		unique_together = (('forecast_time', 'timedelta'),)
 	
 	def pic():
 		def fget(self):
@@ -728,19 +730,21 @@ class GeocodedAladin:
 		self.forecast_time = {}
 	
 	def refresh(self):
-		a = Aladin.objects.all()[0]
 		ft = self.forecast_time.get(6, datetime.datetime.now() - datetime.timedelta(1))
-		timediff = datetime.datetime.now() - ft
-		if timediff > datetime.timedelta(hours=12):
+		a = Aladin.objects.all()[0]
+		#if a.forecast_time > ft:
+		if True:
 			self.load_from_models(Aladin.objects.filter(forecast_time=a.forecast_time))
 	
 	def load_from_models(self, instances):
 		self.tmpfiles = {}
 		self.clean()
 		for i in instances:
-			print 'ALADIN Loading :', i.timedelta
+			#print 'ALADIN Loading...', i.timedelta
 			self.load_from_string(i.processed.read(), i.timedelta, i.forecast_time)
 			self.forecast_time[i.timedelta] = i.forecast_time
+		import gc
+		gc.collect() # remove old images from mem, actually works on 2.6
 	
 	def load_from_string(self, data, n, ft):
 		self.tmpfiles[n] = None # clear reference
@@ -749,17 +753,19 @@ class GeocodedAladin:
 		self.tmpfiles[n].flush()
 		self.load(self.tmpfiles[n].name, n, ft)
 	
-	def __del__(self):
-		self.clean()
-	
 	def clean(self):
 		for n in self.bands.keys():
 			for b in self.bands[n].keys():
-				del self.bands[n][b]
-			del self.bands[n]
+				self.bands[n][b] = None
+			self.bands[n] = {}
 		self.bands = {}
 		self.transform = None
-		self.rows = self.cols = None
+		self.rows = None
+		self.cols = None
+		for k in self.forecast_time.keys():
+			self.forecast_time[k] = None
+		for k in self.images.keys():
+			self.images[k] = None
 		self.forecast_time = {}
 		self.images = {}
 	
