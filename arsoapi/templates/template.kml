@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://earth.google.com/kml/2.1">
+<Document>
+	<name>kml</name>
+	<LookAt id="khLookAtSlovenia">
+		<longitude>14.00</longitude>
+		<latitude>46.00</latitude>
+		<altitude>0.00</altitude>
+		<range>869873.0</range>
+		<tilt>0.0</tilt>
+		<heading>0.0</heading>
+	</LookAt>
+	<Style id="caption">
+		<BalloonStyle>
+		<text>$[description]</text>
+		</BalloonStyle>
+	</Style>
+	<Snippet></Snippet>
+	<description><![CDATA[
+{{ description }}
+]]>
+	</description>
+	<GroundOverlay>
+		<name>{{ description }}</name>
+		<Icon>
+			<href>http://{{ host}}{{ image_url }}</href>
+		</Icon>
+		<LatLonBox id="khLatLonBoxSlovenia">
+			<north>{{ north }}</north>
+			<south>{{ south }}</south>
+			<east>{{ east }}</east>
+			<west>{{ west }}</west>
+			<rotation>   0.00</rotation>
+		</LatLonBox>
+	</GroundOverlay>
+</Document>
+</kml>
