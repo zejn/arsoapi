@@ -9,7 +9,7 @@ class Command(BaseCommand):
 		
 		now = datetime.datetime.now()
 		hour = 0
-		if  12 < now.hour <= 23:
+		if  14 < now.hour <= 23:
 			hour = 12
 		if 0 <= now.hour <= 4:
 			hour = 12

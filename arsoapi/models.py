@@ -27,6 +27,10 @@ GDAL_TRANSLATE = '/usr/bin/gdal_translate'
 GDAL_WARP = '/usr/bin/gdalwarp'
 IMAGEMAGICK_CONVERT = '/usr/bin/convert'
 
+for exe in [GDAL_TRANSLATE, GDAL_WARP, IMAGEMAGICK_CONVERT]:
+	if not os.path.exists(exe):
+		raise Exception("Invalid system setup, missing %s" % exe)
+
 TOCA_MASK_FILE = os.path.join(os.path.dirname(__file__), 'toca_mask.png')
 TOCA_MEJE_FILE = os.path.join(os.path.dirname(__file__), 'toca_meje.png')
 ALADIN_MASK_FILE = os.path.join(os.path.dirname(__file__), 'mask.png')
@@ -42,15 +46,17 @@ class GeoDatasourceError(Exception): pass
 ## Models
 ##############################
 
-
 class RadarPadavin(models.Model):
 	timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
-	last_modified = models.DateTimeField(db_index=True)
+	last_modified = models.DateTimeField(db_index=True, unique=True)
 	picdata = models.TextField()
 	processed = models.FileField(upload_to='processed/radar', null=True, blank=True)
 	
 	class Meta:
 		ordering = ('-timestamp',)
+	
+	def __unicode__(self):
+		return u'%s' % (self.last_modified.strftime('%Y%m%d-%H%M%S'),)
 	
 	def pic():
 		def fget(self):
@@ -74,12 +80,15 @@ class RadarPadavin(models.Model):
 
 class Toca(models.Model):
 	timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
-	last_modified = models.DateTimeField(db_index=True)
+	last_modified = models.DateTimeField(db_index=True, unique=True)
 	picdata = models.TextField()
 	processed = models.FileField(upload_to='processed/toca')
 	
 	class Meta:
 		ordering = ('-timestamp',)
+	
+	def __unicode__(self):
+		return u'%s' % self.last_modified.strftime('%Y%m%d-%H%M')
 	
 	def pic():
 		def fget(self):
@@ -599,7 +608,7 @@ class GeocodedRadar:
 		self.last_modified = None
 	
 	def refresh(self):
-		r = RadarPadavin.objects.all()[0]
+		r = RadarPadavin.objects.exclude(processed=None)[0]
 		if self.last_modified != r.last_modified:
 			self.load_from_model(r)
 	
@@ -740,6 +749,9 @@ class GeocodedAladin:
 		self.clean()
 		for i in instances:
 			#print 'ALADIN Loading...', i.timedelta
+			if not i.processed:
+				continue
+			i.processed.open()
 			self.load_from_string(i.processed.read(), i.timedelta, i.forecast_time)
 			self.forecast_time[i.timedelta] = i.forecast_time
 		import gc

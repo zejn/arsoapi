@@ -15,4 +15,9 @@ urlpatterns = patterns('',
     # Uncomment the next line to enable the admin:
     # url(r'^admin/', include(admin.site.urls)),
     url(r'vreme/report/', 'arsoapi.views.report'),
+    url(r'vreme/kml/radar.kml', 'arsoapi.views.kml_radar'),
+    url(r'vreme/kml/toca.kml', 'arsoapi.views.kml_toca'),
+    url(r'vreme/image/radar.png', 'arsoapi.views.image_radar'),
+    url(r'vreme/image/toca.png', 'arsoapi.views.image_toca'),
+    url(r'vreme/image/aladin_(?P<offset>\d+).png', 'arsoapi.views.image_aladin'),
 )

@@ -1,15 +1,23 @@
 from cStringIO import StringIO
 from django.shortcuts import render_to_response
 from django.http import HttpResponse, Http404
+from django.core.urlresolvers import reverse
+from django.utils._os import safe_join
+from django.conf import settings
+from django.db import models
 
 import datetime
+import os
 import time
 import Image
 import simplejson
 from arsoapi.models import (
-	RadarPadavin, filter_radar, annotate_geo_radar, convert_geotiff_to_png, GeocodedRadar,
-	Aladin, filter_aladin, annotate_geo_aladin, GeocodedAladin, GeocodedToca
+	GeocodedRadar, GeocodedToca, GeocodedAladin,
+	RadarPadavin, Toca, Aladin
 	)
+
+from osgeo import gdal
+import osgeo.gdalconst as gdalc
 
 geocoded_radar = GeocodedRadar()
 geocoded_toca = GeocodedToca()
@@ -21,55 +29,109 @@ def _dumps(s):
 def _datetime2timestamp(dt):
 	return int(time.mktime(dt.timetuple()))
 
+def datetime_encoder(obj):
+	if isinstance(obj, datetime.datetime):
+		return obj.isoformat()
+	elif isinstance(obj, models.fields.files.FieldFile):
+		return None
+	else:
+		raise TypeError, 'Object of type %s with value of %s is not JSON serializable' % (type(obj), repr(obj))
+
+def dump_data(model, day):
+	prevday = day
+	yday = prevday + datetime.timedelta(1)
+	the_day = datetime.datetime(prevday.year, prevday.month, prevday.day, 0, 0, 0)
+	
+	qs = model.objects.filter(timestamp__gte=the_day, timestamp__lt=the_day + datetime.timedelta(1))
+	
+	if qs.count() == 0:
+		return
+	data = []
+	
+	for obj in qs:
+		
+		obj_data = {}
+		for f in obj._meta.fields:
+			obj_data[f.name] = getattr(obj, f.name)
+		
+		data.append(obj_data)
+	dump_dir = safe_join(settings.DUMP_DIR, the_day.strftime('%Y-%m'))
+	dump_file = safe_join(dump_dir, the_day.strftime(model.__name__.lower() + '_%Y-%m-%d.json'))
+	
+	if not os.path.isdir(dump_dir):
+		os.makedirs(dump_dir)
+	
+	f = open(dump_file, 'w')
+	simplejson.dump(data, f, default=datetime_encoder)
+	f.close()
+	
+	os.system('/bin/gzip -9 %s' % dump_file)
+	
+	qs.delete()
+
 def jsonresponse(func):
 	def _inner(*args, **kwargs):
 		jsondata = func(*args, **kwargs)
 		return HttpResponse(_dumps(jsondata), mimetype='application/json')
 	return _inner
 
-def get_radar(stage):
+def image_radar(request):
 	r = RadarPadavin.objects.all()[0]
-	if stage == '0':
-		s = StringIO()
-		r.pic.save(s, 'png')
-		return s.getvalue()
-	
-	filtered = filter_radar(r.pic)
-	if stage == '1':
-		s = StringIO()
-		filtered.save(s, 'png')
-		return s.getvalue()
-	
-	annotated = annotate_geo_radar(filtered)
-	if stage == '2':
-		return convert_geotiff_to_png(annotated)
-	raise Http404
+	return _png_image(r)
 
-def get_aladin(stage, n):
-	a = Aladin.objects.filter(timedelta=n)[0]
-	if stage == '0':
-		s = StringIO()
-		a.pic.save(s, 'png')
-		return s.getvalue()
-	filtered = filter_aladin(a.pic)
-	if stage == '1':
-		s = StringIO()
-		filtered.save(s, 'png')
-		return s.getvalue()
-	annotated = annotate_geo_aladin(filtered)
-	if stage == '2':
-		return convert_geotiff_to_png(annotated)
-	raise Http404
+def image_aladin(request, offset):
+	a = Aladin.objects.all()[0]
+	real = Aladin.objects.filter(forecast_time=a.forecast_time, timedelta=offset)[0]
+	return _png_image(real)
 
-def image(request, what, stage, offset):
-	if what == 'radar':
-		data = get_radar(stage)
-	elif what == 'aladin':
-		try:
-			offset = int(offset)
-		except:
-			raise Http404
-		data = get_aladin(stage, offset)
+def image_toca(request):
+	t = Toca.objects.all()[0]
+	return _png_image(t)
+
+def _kml_file(model):
+	left, lon_pixelsize, a, top, b, lat_pixelsize = model.transform
+	north = top
+	south = top + model.rows*lat_pixelsize
+	east = left + model.cols*lon_pixelsize
+	west = left
+	values = [str(i) for i in (north, south, east, west)]
+	return dict(zip(('north', 'south', 'east', 'west'), values))
+
+def kml_radar(request):
+	m = geocoded_radar
+	m.refresh()
+	context = _kml_file(m)
+	context.update({
+		'host': request.META.get('HTTP_HOST', 'localhost'),
+		'image_url': reverse('arsoapi.views.image_radar'),
+		'description': 'Radarska slika padavin',
+		})
+	return render_to_response('template.kml', context)
+
+def kml_toca(request):
+	m = geocoded_toca
+	m.refresh()
+	context = _kml_file(m)
+	context.update({
+		'host': request.META.get('HTTP_HOST', 'localhost'),
+		'image_url': reverse('arsoapi.views.image_toca'),
+		'description': 'Verjetnost toce',
+		})
+	return render_to_response('template.kml', context)
+
+def _png_image(model):
+	model.processed.open()
+	img = Image.open(model.processed)
+	
+	# alpha transparency for debugging
+	alpha = Image.new('L', (1,1))
+	alpha.putpixel((0,0), 127)
+	alpha = alpha.resize(img.size)
+	img.putalpha(alpha)
+	
+	s = StringIO()
+	img.save(s, 'png')
+	data = s.getvalue()
 	return HttpResponse(data, mimetype='image/png')
 
 def tz2utc_diff():

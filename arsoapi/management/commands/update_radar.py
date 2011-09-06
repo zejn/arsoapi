@@ -4,11 +4,13 @@ from optparse import make_option
 
 class Command(BaseCommand):
 	def handle(self, *args, **options):
-		from django.core.files import File
-		from arsoapi.models import RadarPadavin, fetch_radar, filter_radar, annotate_geo_radar
-		import simplejson
+		from arsoapi.models import RadarPadavin, fetch_radar
+		from StringIO import StringIO
+		import Image
 		
 		imgdata, last_modified = fetch_radar()
+		image = Image.open(StringIO(imgdata))
 		r = RadarPadavin(picdata=imgdata.encode('base64'), last_modified=last_modified)
 		r.save()
+		assert image.size == (819, 658)
 		r.process()
