@@ -155,7 +155,7 @@ def report(request):
 			'error': 'Invalid parameters.'
 		}
 	
-	if not (45.089036 <= lat <= 47.055154 and 12.919922 <= lon <= 16.831055):
+	if not (45.21 <= lat <= 47.05 and 12.92 <= lon <= 16.71):
 		return {
 			'status': 'fail',
 			'error': 'Coordinates out of bounds.'
@@ -171,6 +171,7 @@ def report(request):
 			'status': 'ok',
 			'lat': request.GET.get('lat'),
 			'lon': request.GET.get('lon'),
+			'copyright': u'ARSO, Agencija RS za okolje',
 			'radar': {
 				'updated': _datetime2timestamp(geocoded_radar.last_modified + utc_diff),
 				'updated_text': (geocoded_radar.last_modified + utc_diff).strftime('%Y-%m-%d %H:%M'),

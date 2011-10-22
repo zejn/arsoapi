@@ -23,7 +23,7 @@
 	<GroundOverlay>
 		<name>{{ description }}</name>
 		<Icon>
-			<href>http://{{ host}}{{ image_url }}</href>
+			<href>http://opendata.si{{ image_url }}</href>
 		</Icon>
 		<LatLonBox id="khLatLonBoxSlovenia">
 			<north>{{ north }}</north>

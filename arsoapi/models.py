@@ -197,9 +197,9 @@ def filter_radar(src_img):
 	return im
 
 TOCA_LEVELS = {
-	(255, 238, 89): 1,
-	(255, 179, 75): 2,
-	(255, 97, 72): 3,
+	(255, 238, 89): 33,
+	(255, 179, 75): 66,
+	(255, 97, 72): 100,
 }
 
 def _imageop_divide(im, mask):

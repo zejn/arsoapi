@@ -6,7 +6,7 @@ API za vremenske podatke v Sloveniji
 Namen
 =====
 
-Namen te storitve je ponuditi v nadalnjo rabo podatke o prometnem stanju v
+Namen te storitve je ponuditi v nadalnjo rabo podatke o stanju vremena v
 Sloveniji. Storitev je s strani Kiberpipe brezplačna, potrebno pa je
 spoštovati avtorsko pravico in navesti vire podatkov, ki jih uporabljate.
 
@@ -33,47 +33,101 @@ Vsak klic v primeru napake vrne odgovor::
 Podatki
 =======
 
-Podatki so trenutno na voljo na www.kiberpipa.org. Hostname se lahko v
+Podatki so trenutno na voljo na http://opendata.si. Hostname se lahko v
 prihodnje spremeni.
 
-Dogodki na cestah
------------------
+Vreme na določenih koordinatah
+------------------------------
 
-URL: `/promet/events/`_
+URL: `/vreme/report/`_
 
-Vir podatkov: Direkcija RS za ceste, http://promet.si
+**GET parametri:**
+
+lat
+  float, ki predstavlja zemljepisno širino, npr. 46.051418. Veljavne
+  vrednosti so med 45.21 in 47.05.
+
+lon
+  float, ki predstavlja zemljepisno dolžino, npr. 14.505971. Veljavne
+  vrednosti so med 12.92 in 16.71.
+
+**Struktura vrnjenega rezultata:**
+
+radar
+  vsebuje informacije o padavinah
+
+rain_level
+  je eno izmed 0 (bela), 25 (zelena), 50 (rumena), 75 (oranžna) ali 100 (rdeča)
+
+x, y
+  sta koordinati na transformirani sliki in sta načeloma namenjena debugiranju
+
+hailprob
+  odsek vsebuje informacije o predvideni toči
+
+hail_level
+  je eno izmed 0, 33, 66 ali 100 v naraščujoči verjetnosti toče
+
+forecast
+  odsek je modelska napoved vremena ALADIN
+
+clouds
+  pokritost neba z oblaki v odstotkih
+
+rain
+  dež v milimetrih padavin na triurno obdobje napovedi
+
+offset
+  časovni odmik od napovedi v urah.
 
 
-Burja
------
+**Primer vrnjenega rezultata**::
 
-URL: `/promet/burja/`_
+  {
+    "status": "ok",
+    "copyright": "ARSO, Agencija RS za okolje",
+    "lon": "12.92",
+    "forecast": {
+        "y": 139,
+        "x": 32,
+        "updated": 1319277600,
+        "data": [
+            {
+                "forecast_time": "2011-10-22 20:00",
+                "clouds": 0,
+                "rain": 0,
+                "offset": 6
+            },
+            ...
+        ]
+    },
+    "radar": {
+        "y": 156,
+        "updated_text": "2011-10-22 19:39",
+        "updated": 1319305162,
+        "rain_level": 0,
+        "x": 99
+    },
+    "lat": "47.05",
+    "hailprob": {
+        "y": 52,
+        "updated_text": "2011-10-22 19:48",
+        "updated": 1319305695,
+        "hail_level": 0,
+        "x": 5
+    }
+  }
 
-Vir podatkov: Direkcija RS za ceste, http://promet.si
 
-Burja - znaki
--------------
+Vir podatkov: Agencija RS za okolje, http://www.arso.gov.si/
 
-URL: `/promet/burjaznaki/`_
 
-Vir podatkov: Direkcija RS za ceste, http://promet.si
+KML za Google Maps
+------------------
 
-Števci prometa
---------------
+Za razvoj sem za preverjanje uporabil Google maps, za katerega je na
+voljo `KML s polprosojno sliko vremena po Sloveniji`_.
 
-URL: `/promet/counters/`_
-
-Vir podatkov: Direkcija RS za ceste, http://promet.si
-
-Parkirišča LPT
---------------
-
-URL: `/promet/parkirisca/lpt/`_
-
-Vir podatkov: Javno podjetje Ljubljanska parkirišča in tržnice, d.o.o., http://www.lpt.si
-
-.. _`/promet/events/`: http://www.kiberpipa.org/promet/events/
-.. _`/promet/burja/`: http://www.kiberpipa.org/promet/burja/
-.. _`/promet/burjaznaki/`: http://www.kiberpipa.org/promet/burjaznaki/
-.. _`/promet/counters/`: http://www.kiberpipa.org/promet/counters/
-.. _`/promet/parkirisca/lpt/`: http://www.kiberpipa.org/promet/parkirisca/lpt/
+.. _`KML s polprosojno sliko vremena po Sloveniji`: https://maps.google.com/?q=http://opendata.si/vreme/kml/radar.kml
+.. _`/vreme/kml/radar.kml`: http://opendata.si/vreme/kml/radar.kml
+.. _`/vreme/report/`: http://opendata.si/vreme/report/
