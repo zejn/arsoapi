@@ -170,7 +170,9 @@ def fetch_radar():
 
 def fetch_toca():
 	now = datetime.datetime.utcnow()
-	now = now - datetime.timedelta(seconds=60*2) # two minutes in past
+	# an image appears 8 minutes over the 10 minute interval
+	# so this will map to the right 10 minute interval most of the time
+	now = now - datetime.timedelta(seconds=60*8)
 	now = now.replace(minute=now.minute - now.minute % 10)
 	
 	url = URL_VREME_TOCA % now.strftime('%Y%m%d-%H%M')
