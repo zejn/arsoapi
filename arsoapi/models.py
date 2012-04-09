@@ -18,6 +18,9 @@ from arsoapi.laplacian import laplacian
 from osgeo import gdal
 import osgeo.gdalconst as gdalc
 
+# set to 1 to print out stuff
+LOG_LEVEL = getattr(settings, 'LOG_LEVEL', 0)
+
 URL_VREME_RADAR = 'http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif'
 URL_VREME_TOCA  = 'http://www.meteo.si/uploads/probase/www/warning/graphic/warning_%s_hp_si.jpg'
 #URL_VREME_ALADIN = 'http://www.arso.gov.si/vreme/napovedi%%20in%%20podatki/aladin/AW00_oblpad_%.3d.png'
@@ -38,7 +41,22 @@ ALADIN_MEJE_FILE = os.path.join(os.path.dirname(__file__), 'meje.png')
 
 # init
 gdal.AllRegister()
-print 'Gdal version', gdal.VersionInfo()
+#print 'Gdal version', gdal.VersionInfo()
+
+def popen(*args, **kwargs):
+	"a wrapper in order to suppress messages if debug is set to false"
+	params = {}
+	params.update(kwargs)
+	if not LOG_LEVEL:
+		params['stderr'] = subprocess.PIPE
+		params['stdout'] = subprocess.PIPE
+	return subprocess.Popen(*args, **params)
+
+def check_popen_error(p):
+	if p.returncode is not None:
+		if p.returncode != 0:
+			print p.stdout.read()
+			print p.stderr.read()
 
 class GeoDatasourceError(Exception): pass
 
@@ -156,7 +174,6 @@ def fetch_toca():
 	now = now.replace(minute=now.minute - now.minute % 10)
 	
 	url = URL_VREME_TOCA % now.strftime('%Y%m%d-%H%M')
-	print url
 	return fetch(url)
 
 def fetch_aladin(ft, n):
@@ -514,30 +531,37 @@ def filter_aladin_old(src_img):
 	return im
 
 def annotate_geo_radar(img):
-	print 'ANN radar: Annotating'
+	if LOG_LEVEL:
+		print 'ANN radar: Annotating'
 	src = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar1_', suffix='.tif')
 	tmp = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar2_', suffix='.tif')
 	dst = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar3_', suffix='.tif')
 	img.save(src.name, 'tiff')
 	src.flush()
 	
-	print 'ANN radar: gdal translate'
+	if LOG_LEVEL:
+		print 'ANN radar: gdal translate'
 	# magic numbers, geocoded pixels
 	cmd = '-gcp 251 246 401712 154018 -gcp 625 215 589532 169167 -gcp 507 479 530526 38229 -a_srs EPSG:3787'.split(' ')
-	p = subprocess.Popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
+	p = popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
 	p.wait()
+	check_popen_error(p)
 	
-	print 'ANN radar: gdal warp'
-	p = subprocess.Popen([GDAL_WARP] + '-s_srs EPSG:3787 -t_srs EPSG:4326'.split(' ') + [tmp.name, dst.name])
+	if LOG_LEVEL:
+		print 'ANN radar: gdal warp'
+	p = popen([GDAL_WARP] + '-s_srs EPSG:3787 -t_srs EPSG:4326'.split(' ') + [tmp.name, dst.name])
 	p.wait()
+	check_popen_error(p)
 	
-	print 'ANN radar: done'
+	if LOG_LEVEL:
+		print 'ANN radar: done'
 	dst.seek(0)
 	processed = dst.read()
 	return processed
 
 def annotate_geo_toca(img):
-	print 'ANN toca: Annotating'
+	if LOG_LEVEL:
+		print 'ANN toca: Annotating'
 	src = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='toca1_', suffix='.tif')
 	tmp = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='toca3_', suffix='.tif')
 	dst = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='toca3_', suffix='.tif')
@@ -545,43 +569,54 @@ def annotate_geo_toca(img):
 	img.save(src.name, 'tiff')
 	src.flush()
 	
-	print 'ANN toca: gdal translate'
+	if LOG_LEVEL:
+		print 'ANN toca: gdal translate'
 	cmd = '-gcp 94 131 401712 154018 -gcp 542 97 589532 168167 -gcp 398 408 530526 38229 -a_srs EPSG:3787'.split(' ')
-	p = subprocess.Popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
+	p = popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
 	p.wait()
+	check_popen_error(p)
 	
-	print 'ANN toca: gdal warp'
-	p = subprocess.Popen([GDAL_WARP] + '-s_srs EPSG:3787 -t_srs EPSG:4326'.split(' ') + [tmp.name, dst.name])
+	if LOG_LEVEL:
+		print 'ANN toca: gdal warp'
+	p = popen([GDAL_WARP] + '-s_srs EPSG:3787 -t_srs EPSG:4326'.split(' ') + [tmp.name, dst.name])
 	p.wait()
+	check_popen_error(p)
 	
-	print 'ANN toca: done'
+	if LOG_LEVEL:
+		print 'ANN toca: done'
 	dst.seek(0)
 	processed = dst.read()
 	return processed
 
 
 def annotate_geo_aladin(img):
-	print 'ANN aladin: Annotating'
+	if LOG_LEVEL:
+		print 'ANN aladin: Annotating'
 	src = tempfile.NamedTemporaryFile(dir=settings.TEMPORARY_DIR, prefix='aladin1_', suffix='.tif')
 	tmp = tempfile.NamedTemporaryFile(dir=settings.TEMPORARY_DIR, prefix='aladin2_', suffix='.tif')
 	dst = tempfile.NamedTemporaryFile(dir=settings.TEMPORARY_DIR, prefix='aladin3_', suffix='.tif')
 	img.save(src.name, 'tiff')
 	src.flush()
 	
-	print 'ANN aladin: gdal translate'
+	if LOG_LEVEL:
+		print 'ANN aladin: gdal translate'
 	# old aladin
 	#cmd = '-gcp 530 194 622883 149136 -gcp 360 408 530526 38229 -gcp 116 187 401712 154018 -a_srs EPSG:3787'.split(' ')
 	# magic numbers - geocoded pixels
 	cmd = '-gcp 573 144 622883 149136 -gcp 424 323 530526 38229 -gcp 218 136 401712 154018 -a_srs EPSG:3787'.split(' ')
 	
-	p = subprocess.Popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
+	p = popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
 	p.wait()
+	check_popen_error(p)
 	
-	print 'ANN aladin: gdal warp'
-	p = subprocess.Popen([GDAL_WARP] + '-s_srs EPSG:3787 -t_srs EPSG:4326'.split(' ') + [tmp.name, dst.name])
+	if LOG_LEVEL:
+		print 'ANN aladin: gdal warp'
+	p = popen([GDAL_WARP] + '-s_srs EPSG:3787 -t_srs EPSG:4326'.split(' ') + [tmp.name, dst.name])
 	p.wait()
+	check_popen_error(p)
 	
-	print 'ANN aladin: done'
+	if LOG_LEVEL:
+		print 'ANN aladin: done'
 	dst.seek(0)
 	processed = dst.read()
 	return processed
@@ -594,8 +629,9 @@ def convert_geotiff_to_png(tiffdata):
 	src.write(tiffdata)
 	src.flush()
 	
-	p = subprocess.Popen([IMAGEMAGICK_CONVERT, src.name, dst.name])
+	p = popen([IMAGEMAGICK_CONVERT, src.name, dst.name])
 	p.wait()
+	check_popen_error(p)
 	
 	dst.seek(0)
 	return dst.read()

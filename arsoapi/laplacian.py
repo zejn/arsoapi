@@ -101,7 +101,7 @@ except (ImportError, AttributeError), e:
 if _laplacian is None:
 	laplacian = _py_laplacian
 else:
-	print 'Using C laplacian'
+	#print 'Using C laplacian'
 	from cStringIO import StringIO
 	import re
 	import Image
