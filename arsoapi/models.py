@@ -170,7 +170,7 @@ def fetch_radar():
 
 def fetch_toca():
 	now = datetime.datetime.utcnow()
-	now = now - datetime.timedelta(seconds=120)
+	now = now - datetime.timedelta(seconds=60*6) # experimentally determined
 	now = now.replace(minute=now.minute - now.minute % 10)
 	
 	url = URL_VREME_TOCA % now.strftime('%Y%m%d-%H%M')

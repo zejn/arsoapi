@@ -9,6 +9,9 @@ class Command(BaseCommand):
 		import simplejson
 		
 		imgdata, last_modified = fetch_toca()
-		r = Toca(picdata=imgdata.encode('base64'), last_modified=last_modified)
-		r.save()
-		r.process()
+		try:
+			r = Toca.objects.get(last_modified=last_modified)
+		except Toca.DoesNotExist:
+			r = Toca(picdata=imgdata.encode('base64'), last_modified=last_modified)
+			r.save()
+			r.process()

@@ -16,9 +16,16 @@ class Command(BaseCommand):
 			now = now - datetime.timedelta(1)
 		ft = datetime.datetime(now.year, now.month, now.day, hour)
 		
-		for n in range(6,73,3):
-			img_data, last_modified = fetch_aladin(ft, n)
-			a = Aladin(timestamp=last_modified, forecast_time=ft, timedelta=n, picdata=img_data.encode('base64'))
-			a.save()
-			a.process()
-		
+		class AlreadyProcessed(Exception): pass
+		try:
+			for n in range(6,73,3):
+				img_data, last_modified = fetch_aladin(ft, n)
+				try:
+					a = Aladin.objects.get(forecast_time=ft, timedelta=n)
+					raise AlreadyProcessed()
+				except Aladin.DoesNotExist:
+					a = Aladin(timestamp=last_modified, forecast_time=ft, timedelta=n, picdata=img_data.encode('base64'))
+					a.save()
+					a.process()
+		except AlreadyProcessed:
+			pass

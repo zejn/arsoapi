@@ -10,7 +10,10 @@ class Command(BaseCommand):
 		
 		imgdata, last_modified = fetch_radar()
 		image = Image.open(StringIO(imgdata))
-		r = RadarPadavin(picdata=imgdata.encode('base64'), last_modified=last_modified)
-		r.save()
-		assert image.size == (819, 658)
-		r.process()
+		try:
+			r = RadarPadavin.objects.get(last_modified=last_modified)
+		except RadarPadavin.DoesNotExist:
+			r = RadarPadavin(picdata=imgdata.encode('base64'), last_modified=last_modified)
+			r.save()
+			assert image.size == (819, 658)
+			r.process()
