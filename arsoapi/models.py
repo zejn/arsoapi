@@ -25,6 +25,8 @@ URL_VREME_RADAR = 'http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gi
 URL_VREME_TOCA  = 'http://www.meteo.si/uploads/probase/www/warning/graphic/warning_%s_hp_si.jpg'
 #URL_VREME_ALADIN = 'http://www.arso.gov.si/vreme/napovedi%%20in%%20podatki/aladin/AW00_oblpad_%.3d.png'
 URL_VREME_ALADIN = 'http://meteo.arso.gov.si/uploads/probase/www/model/aladin/field/as_%s-%s_tcc-rr_si-neighbours_%.3d.png'
+URL_VREME_VETER = 'http://www.meteo.si/uploads/probase/www/model/aladin/field/as_%s-%s_r-t-vf850_si-neighbours_%.3d.png'
+
 
 GDAL_TRANSLATE = '/usr/bin/gdal_translate'
 GDAL_WARP = '/usr/bin/gdalwarp'
@@ -38,6 +40,8 @@ TOCA_MASK_FILE = os.path.join(os.path.dirname(__file__), 'toca_mask.png')
 TOCA_MEJE_FILE = os.path.join(os.path.dirname(__file__), 'toca_meje.png')
 ALADIN_MASK_FILE = os.path.join(os.path.dirname(__file__), 'mask.png')
 ALADIN_MEJE_FILE = os.path.join(os.path.dirname(__file__), 'meje.png')
+
+datafile = lambda x: os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', x))
 
 # init
 gdal.AllRegister()
@@ -159,6 +163,38 @@ class Aladin(models.Model):
 		self.processed.save(name=self.image_name(), content=ContentFile(geotiff))
 		self.save()
 
+class Veter(models.Model):
+	timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+	forecast_time = models.DateTimeField(db_index=True)
+	timedelta = models.IntegerField()
+	picdata = models.TextField()
+	processed = models.FileField(upload_to='processed/veter', null=True, blank=True)
+	
+	class Meta:
+		ordering = ('-forecast_time', '-timedelta')
+		unique_together = (('forecast_time', 'timedelta'),)
+	
+	def pic():
+		def fget(self):
+			if self.picdata:
+				return Image.open(StringIO(self.picdata.decode('base64')))
+		def fset(self, value):
+			s = StringIO()
+			value.save(s)
+			self.picdata = s.getvalue().encode('base64')
+		return fget, fset
+	pic = property(*pic())
+	
+	def image_name(self):
+		return 'veter_%s_%s.tif' % (self.forecast_time.strftime('%Y%m%d-%H%M'), self.timedelta)
+	
+	def process(self):
+		return
+
+		#filtered = filter_aladin(self.pic)
+		#geotiff = annotate_geo_aladin(filtered)
+		#self.processed.save(name=self.image_name(), content=ContentFile(geotiff))
+		#self.save()
 
 
 ###############################
@@ -179,9 +215,12 @@ def fetch_toca():
 	return fetch(url)
 
 def fetch_aladin(ft, n):
-
 	assert n % 3 == 0
 	return fetch(URL_VREME_ALADIN % (ft.strftime('%Y%m%d'), ft.strftime('%H%M'), n))
+
+def fetch_veter(ft, n):
+	assert n % 3 == 0
+	return fetch(URL_VREME_VETER % (ft.strftime('%Y%m%d'), ft.strftime('%H%M'), n))
 
 RADAR_CRTE = (96,96,96)
 WHITE = (255,255,255)
@@ -283,6 +322,38 @@ def filter_toca(src_img):
 				pixels[i,j] = elected
 	
 	return im
+
+########### VETER
+
+def color_invert(a):
+	return tuple([0xff - i for i in a])
+
+def convolve(a, b):
+	assert a.size == b.size
+	n = 0
+	pixa = a.load()
+	pixb = b.load()
+	for x in xrange(a.size[0]):
+		for y in xrange(a.size[1]):
+			n += sum([i*j for i, j in
+				zip(
+					color_invert(pixa[(x,y)]),
+					color_invert(pixb[(x,y)])
+				)])
+	return n
+
+def find_direction(img):
+	rotations = Image.open(datafile('wind_rotations.png'))
+	off = 45
+	sums = []
+	for n in xrange(0, 360):
+		mask = rotations.crop((n*off, 0, n*off+off, off))
+		sums.append(convolve(mask, img))
+	result = sorted([(i, n) for n, i in enumerate(sums)], reverse=True)
+	
+	# returns score, deg
+	return result[0]
+
 
 ALADIN_CRTE = (123,123,123)
 ALADIN_BACKGROUND = (241, 241, 241)
@@ -531,6 +602,11 @@ def filter_aladin_old(src_img):
 			pending_bboxes.append((min_x, max_x, min_y, max_y))
 	
 	return im
+
+def get_wind_points():
+	for x in xrange(22, 640, 22):
+		for y in xrange(22, 480, 22):
+			yield (x, int(y / 22 * 21.7777777777777))
 
 def annotate_geo_radar(img):
 	if LOG_LEVEL:
