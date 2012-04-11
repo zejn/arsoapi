@@ -151,7 +151,7 @@ LOGGING = {
 }
 
 TEMPORARY_DIR = here('tmp')
-DUMP_DIR = here('~/dumps/arsoapi')
+DUMP_DIR = os.path.expanduser('~/dumps/arsoapi')
 
 try:
     from djangosecret import SECRET_KEY
