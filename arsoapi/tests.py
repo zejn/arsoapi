@@ -9,17 +9,23 @@ from arsoapi.models import RadarPadavin, GeocodedRadar, Toca, GeocodedToca, Alad
 datafile = lambda x: os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', x))
 
 class TestVreme(unittest.TestCase):
-	@unittest.skip('needs fixing')
 	def test01_radar(self):
-		img_data = open(datafile('test01_radar.gif')).read()
+		results = [
+			((46.267240, 15.850525), ((234, 661), 75)),
+			((46.244451, 15.644531), ((238, 625), 50)),
+			((46.541860, 15.729675), ((186, 640), 50)),
+			((46.434071, 15.457764), ((205, 593), 0)),
+		]
+		img_data = open(datafile('test_radar.gif')).read()
 		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
 		r.save()
+		r.process()
 		gr = GeocodedRadar()
 		gr.load_from_model(r)
 		
-		pos, rain_level = gr.get_rain_at_coords(45.545763, 14.106696)
-		self.assertEqual(pos, (358, 361), 'Pixel coords are off?')
-		self.assertEqual(rain_level, 100, 'Rain not a 100% where it should be')
+		for coords, expected in results:
+			got = gr.get_rain_at_coords(*coords)
+			self.assertEqual(got, expected, 'invalid value at %r: %r instead of %r' % (coords, got, expected))
 		
 		del gr
 		r.delete()
@@ -43,6 +49,9 @@ class TestVreme(unittest.TestCase):
 		for coords, expected in results:
 			got = gt.get_toca_at_coords(*coords)
 			self.assertEqual(got, expected, 'invalid value at %r: %r instead of %r' % (coords, got, expected))
+		
+		del gt
+		t.delete()
 	
 	@unittest.skip('needs fixing')
 	def test03_aladin(self):
@@ -99,8 +108,9 @@ class TestVreme(unittest.TestCase):
 		got = flags2directions(im)
 		expected = pickle.load(open(datafile('test_direction_1.pck')))
 		self.assertEqual(got, expected)
-		
-		
+	
+	def test06_veter_jakost(self):
+		pass
 		
 		
 		
