@@ -323,36 +323,9 @@ def filter_toca(src_img):
 	
 	return im
 
-########### VETER
 
-def color_invert(a):
-	return tuple([0xff - i for i in a])
 
-def convolve(a, b):
-	assert a.size == b.size
-	n = 0
-	pixa = a.load()
-	pixb = b.load()
-	for x in xrange(a.size[0]):
-		for y in xrange(a.size[1]):
-			n += sum([i*j for i, j in
-				zip(
-					color_invert(pixa[(x,y)]),
-					color_invert(pixb[(x,y)])
-				)])
-	return n
 
-def find_direction(img):
-	rotations = Image.open(datafile('wind_rotations.png'))
-	off = 45
-	sums = []
-	for n in xrange(0, 360):
-		mask = rotations.crop((n*off, 0, n*off+off, off))
-		sums.append(convolve(mask, img))
-	result = sorted([(i, n) for n, i in enumerate(sums)], reverse=True)
-	
-	# returns score, deg
-	return result[0]
 
 
 ALADIN_CRTE = (123,123,123)
@@ -602,11 +575,6 @@ def filter_aladin_old(src_img):
 			pending_bboxes.append((min_x, max_x, min_y, max_y))
 	
 	return im
-
-def get_wind_points():
-	for x in xrange(22, 640, 22):
-		for y in xrange(22, 480, 22):
-			yield (x, int(y / 22 * 21.7777777777777))
 
 def annotate_geo_radar(img):
 	if LOG_LEVEL:
