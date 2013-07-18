@@ -3,6 +3,7 @@ from PIL import Image, ImageDraw
 import math
 from arsoapi.models import filter_radar
 import time
+import collections
 
 red = (0xfa, 0x00, 0x00)
 orange = (0xfa, 0x7d, 0x00)
@@ -19,6 +20,8 @@ remap = {
     gray: 200,
     white: 255
     }
+
+COLORS = remap.values()
 
 
 def score_xor(arr_a, arr_b):
@@ -155,6 +158,20 @@ def vreme_transform(im1, im2):
     imc = imc.transform(im1.size, Image.MESH, quads)
     return imc
 
+def has_rain(img):
+    img = img.convert('RGB')
+    img = img.crop((9,48,809,648))
+    pixdata = img.load()
+    siz = img.size
+    
+    img.save('tmp_test01.png')
+    
+    for x in xrange(0, siz[0], 3):
+        for y in xrange(0, siz[1], 3):
+            if pixdata[(x,y)] == green:
+                return True
+    return False
+
 def pic2rawdata(img):
     filtered = filter_radar(img)
     
@@ -166,7 +183,7 @@ def pic2rawdata(img):
     
     pixdata = cropped.load()
     siz = cropped.size
-    
+
     # remove light gray area
     for x in xrange(siz[0]):
         for y in xrange(siz[1]):
@@ -203,7 +220,7 @@ def pic2rawdata(img):
     def nearest(c):
         n = list(sorted([(abs(i-c), i) for i in colors]))
         return n[0][1]
-    
+
     imgdata2 = np.empty((siz[0]/4, siz[1]/4), np.uint8)
     
     for x in xrange(0, siz[0], 4):
