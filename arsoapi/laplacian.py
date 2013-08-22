@@ -104,7 +104,7 @@ else:
 	#print 'Using C laplacian'
 	from cStringIO import StringIO
 	import re
-	import Image
+	from PIL import Image
 	
 	def laplacian(im):
 		s = StringIO()

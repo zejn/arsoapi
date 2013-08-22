@@ -1,6 +1,6 @@
 
 import datetime
-import Image
+from PIL import Image
 import os
 import pytz
 import subprocess

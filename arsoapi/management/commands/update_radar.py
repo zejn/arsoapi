@@ -6,7 +6,7 @@ class Command(BaseCommand):
 	def handle(self, *args, **options):
 		from arsoapi.models import RadarPadavin, fetch_radar
 		from StringIO import StringIO
-		import Image
+		from PIL import Image
 		
 		imgdata, last_modified = fetch_radar()
 		image = Image.open(StringIO(imgdata))
