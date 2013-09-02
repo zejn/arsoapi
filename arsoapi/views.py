@@ -47,16 +47,31 @@ def dump_data(model, day):
 	
 	if qs.count() == 0:
 		return
-	data = []
 	
-	cur = connection.cursor()
 	sql, params = qs.query.get_compiler('default').as_sql()
-	cur.execute(sql, params)
-	labels = [i[0] for i in cur.cursor.description]
-	sqldata = cur.fetchall()
-	for rec in sqldata:
-		obj_data = dict(zip(labels, rec))
-		data.append(obj_data)
+	
+	class Dumper(list):
+		def __init__(self, sql, params):
+			self.cur = connection.cursor()
+			self.cur.execute(sql, params)
+			self.labels = [i[0] for i in self.cur.cursor.description]
+		
+		def __nonzero__(self):
+			return True
+		
+		def __iter__(self):
+			return self
+		
+		def next(self):
+			rec = self.cur.fetchone()
+			if rec is not None:
+				obj_data = dict(zip(self.labels, rec))
+				return obj_data
+			else:
+				raise StopIteration
+			
+	
+	dumper = Dumper(sql, params)
 	
 	dump_dir = safe_join(settings.DUMP_DIR, the_day.strftime('%Y-%m'))
 	dump_file = safe_join(dump_dir, the_day.strftime(model.__name__.lower() + '_%Y-%m-%d.json'))
@@ -65,7 +80,8 @@ def dump_data(model, day):
 		os.makedirs(dump_dir)
 	
 	f = open(dump_file, 'w')
-	simplejson.dump(data, f, default=datetime_encoder)
+	for frag in simplejson.JSONEncoder(default=datetime_encoder).iterencode(dumper):
+		f.write(frag)
 	f.close()
 	
 	os.system('/bin/gzip -9 %s' % dump_file)
