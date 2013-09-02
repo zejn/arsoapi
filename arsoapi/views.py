@@ -38,6 +38,7 @@ def datetime_encoder(obj):
 		raise TypeError, 'Object of type %s with value of %s is not JSON serializable' % (type(obj), repr(obj))
 
 def dump_data(model, day):
+	from django.db import connection
 	prevday = day
 	yday = prevday + datetime.timedelta(1)
 	the_day = datetime.datetime(prevday.year, prevday.month, prevday.day, 0, 0, 0)
@@ -48,13 +49,15 @@ def dump_data(model, day):
 		return
 	data = []
 	
-	for obj in qs:
-		
-		obj_data = {}
-		for f in obj._meta.fields:
-			obj_data[f.name] = getattr(obj, f.name)
-		
+	cur = connection.cursor()
+	sql, params = qs.query.get_compiler('default').as_sql()
+	cur.execute(sql, params)
+	labels = [i[0] for i in cur.cursor.description]
+	sqldata = cur.fetchall()
+	for rec in sqldata:
+		obj_data = dict(zip(labels, rec))
 		data.append(obj_data)
+	
 	dump_dir = safe_join(settings.DUMP_DIR, the_day.strftime('%Y-%m'))
 	dump_file = safe_join(dump_dir, the_day.strftime(model.__name__.lower() + '_%Y-%m-%d.json'))
 	
