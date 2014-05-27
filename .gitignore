@@ -1,0 +1,5 @@
+.virtualenv
+*.pyc
+*.o
+*.so
+arsoapi/media/processed/radar
