@@ -184,14 +184,26 @@ def fetch_aladin(ft, n):
 	return fetch(URL_VREME_ALADIN % (ft.strftime('%Y%m%d'), ft.strftime('%H%M'), n))
 
 RADAR_CRTE = (96,96,96)
+RADAR_KRIZ = (16,16,16)
 WHITE = (255,255,255)
 BLACK = (0, 0, 0)
 RADAR_DEZ = {
 	WHITE:			0,
-	(25, 185, 0):	25,
-	(250, 225, 0):	50,
-	(250, 125, 0):	75,
-	(250, 0, 0):	100,
+	(  0, 125,   0):		2, # interp.
+	( 50, 150,   0):		5,
+	(100, 175,   0):		7, # interp.
+	(150, 200,   0):		10,
+	(200, 225,   0):		15, # interp.
+	(250, 225,   0):		20,
+	(250, 187,   0):		35, # interp.
+	(250, 125,   0):		50,
+	(250,  62,   0):		100, # interp.
+	(250,   0,   0):		150,
+	(225,   0,  50):		330, # interp.
+	(200,   0, 125):		500,
+	(175,   0, 200):		750, # interp.
+	(150,	0, 225):		1000,
+	(125,   0, 250):		1500, # interp.
 }
 
 def filter_radar(src_img):
@@ -203,7 +215,7 @@ def filter_radar(src_img):
 	for i in range(im.size[0]):
 		for j in range(im.size[1]):
 			cc[pixels[i,j]] += 1
-			if pixels[i,j] == RADAR_CRTE:
+			if pixels[i,j] == RADAR_CRTE or pixels[i,j] == RADAR_KRIZ:
 				c = Counter()
 				for p in (pixels[i-1,j], pixels[i,j-1], pixels[i+1,j], pixels[i,j+1]):
 					if p in RADAR_DEZ.keys():
