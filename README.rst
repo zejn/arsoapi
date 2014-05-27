@@ -59,6 +59,9 @@ radar
 rain_level
   je eno izmed 0 (bela), 25 (zelena), 50 (rumena), 75 (oranžna) ali 100 (rdeča)
 
+rain_mmph
+  jakost padavin v milimetrih na uro
+
 x, y
   sta koordinati na transformirani sliki in sta načeloma namenjena debugiranju
 

@@ -180,7 +180,7 @@ def report(request):
 			'error': 'Coordinates out of bounds.'
 			}
 	else:
-		posR, rain_level = geocoded_radar.get_rain_at_coords(lat, lon)
+		posR, rain_mmph = geocoded_radar.get_rain_at_coords(lat, lon)
 		posT, toca_level = geocoded_toca.get_toca_at_coords(lat, lon)
 		posA, forecast = geocoded_aladin.get_forecast_at_coords(lat, lon)
 		
@@ -196,7 +196,8 @@ def report(request):
 				'updated_text': (geocoded_radar.last_modified + utc_diff).strftime('%Y-%m-%d %H:%M'),
 				'x': posR[0],
 				'y': posR[1],
-				'rain_level': rain_level,
+				'rain_level': 0, #FIXME: let's be backwards compatible
+				'rain_mmph': rain_mmph,
 			},
 			'hailprob': {
 				'updated': _datetime2timestamp(geocoded_toca.last_modified + utc_diff),
