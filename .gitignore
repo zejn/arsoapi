@@ -3,3 +3,6 @@
 *.o
 *.so
 arsoapi/media/processed/radar
+arsoapi/media/processed/aladin
+arsoapi/media/processed/toca
+arsoapi/tmp/*.tif
