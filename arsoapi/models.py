@@ -708,7 +708,8 @@ class GeocodedRadar:
 		xOffset = abs(int((lat-xOrigin) / pixelWidth)) # XXX remove abs
 		yOffset = abs(int((lng-yOrigin) / pixelHeight))
 		
-		return (xOffset, yOffset), tuple((int(b[xOffset,yOffset]) for b in self.bands.itervalues()))
+		# x and y in these coordinates are switched for some reason?
+		return (yOffset, xOffset), tuple((int(b[xOffset,yOffset]) for b in self.bands.itervalues()))
 	
 	def get_rain_at_coords(self, lat, lng):
 		position, pixel = self.get_pixel_at_coords(lat, lng)
