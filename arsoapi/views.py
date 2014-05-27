@@ -9,7 +9,7 @@ from django.db import models
 import datetime
 import os
 import time
-import Image
+from PIL import Image
 import simplejson
 from arsoapi.models import (
 	GeocodedRadar, GeocodedToca, GeocodedAladin,
