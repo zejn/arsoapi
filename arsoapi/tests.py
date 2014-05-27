@@ -3,12 +3,20 @@ import datetime
 import os
 import unittest
 
-from arsoapi.models import RadarPadavin, GeocodedRadar, Aladin, GeocodedAladin
+from arsoapi.models import RadarPadavin, GeocodedRadar, Aladin, GeocodedAladin, mmph_to_level
 
 
 datafile = lambda x: os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', x))
 
 class TestVreme(unittest.TestCase):
+	def test_mmph_to_level(self):
+		self.assertEqual(mmph_to_level(0.0), 0)
+		self.assertEqual(mmph_to_level(0.5), 25)
+		self.assertEqual(mmph_to_level(2.5), 50)
+		self.assertEqual(mmph_to_level(15.), 75)
+		self.assertEqual(mmph_to_level(60.), 100)
+		self.assertEqual(mmph_to_level(1000.), 100)
+
 	def test01_radar(self):
 		img_data = open(datafile('test_sirad_si1_si2.gif')).read()
 		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
