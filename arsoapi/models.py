@@ -544,7 +544,8 @@ def annotate_geo_radar(img):
 	if LOG_LEVEL:
 		print 'ANN radar: gdal translate'
 	# magic numbers, geocoded pixels
-	cmd = '-gcp 251 246 401712 154018 -gcp 625 215 589532 169167 -gcp 507 479 530526 38229 -a_srs EPSG:3787'.split(' ')
+	# syntax: -gcp x y east north
+	cmd = '-gcp 250 245 401712 154018 -gcp 624 214 589532 169167 -gcp 506 478 530526 38229 -a_srs EPSG:3787'.split(' ')
 	p = popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
 	p.wait()
 	check_popen_error(p)
