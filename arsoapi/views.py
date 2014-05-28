@@ -14,11 +14,13 @@ import simplejson
 from arsoapi.models import (
 	GeocodedRadar, GeocodedToca, GeocodedAladin,
 	RadarPadavin, Toca, Aladin,
-	mmph_to_level
+	mmph_to_level,
+	WHITE
 	)
 
 from osgeo import gdal
 import osgeo.gdalconst as gdalc
+import numpy
 
 geocoded_radar = GeocodedRadar()
 geocoded_toca = GeocodedToca()
@@ -141,15 +143,20 @@ def kml_toca(request):
 
 def _png_image(model):
 	model.processed.open()
-	img = Image.open(model.processed)
-	
-	# alpha transparency for debugging
-	alpha = Image.new('L', (1,1))
-	alpha.putpixel((0,0), 127)
-	alpha = alpha.resize(img.size)
-	img.putalpha(alpha)
-	
+	img = Image.open(model.processed).convert('RGBA')
+
+	a = numpy.array(numpy.asarray(img))
+
+	# select white color
+	d = (a[:,:,0] == WHITE[0]) & (a[:,:,1] == WHITE[1]) & (a[:,:,2] == WHITE[2])
+
+	# make white pixels completely transparent
+	a[d,3] = 0
+	# make non-white pixels partially transparent
+	a[~d,3] = 128
+
 	s = StringIO()
+	img = Image.fromarray(a, mode='RGBA')
 	img.save(s, 'png')
 	data = s.getvalue()
 	return HttpResponse(data, mimetype='image/png')
