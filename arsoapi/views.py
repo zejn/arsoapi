@@ -13,7 +13,8 @@ from PIL import Image
 import simplejson
 from arsoapi.models import (
 	GeocodedRadar, GeocodedToca, GeocodedAladin,
-	RadarPadavin, Toca, Aladin
+	RadarPadavin, Toca, Aladin,
+	mmph_to_level
 	)
 
 from osgeo import gdal
@@ -196,7 +197,7 @@ def report(request):
 				'updated_text': (geocoded_radar.last_modified + utc_diff).strftime('%Y-%m-%d %H:%M'),
 				'x': posR[0],
 				'y': posR[1],
-				'rain_level': 0, #FIXME: let's be backwards compatible
+				'rain_level': mmph_to_level(rain_mmph),
 				'rain_mmph': rain_mmph,
 			},
 			'hailprob': {

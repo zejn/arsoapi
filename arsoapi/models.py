@@ -206,6 +206,18 @@ RADAR_DEZ = {
 	(125,   0, 250):		150.0, # interp.
 }
 
+def mmph_to_level(mmph):
+	if mmph < 0.1:
+		return 0
+	if mmph <= 1.0:
+		return 25
+	elif mmph <= 5.0:
+		return 50
+	elif mmph <= 50.0:
+		return 75
+	else:
+		return 100
+
 def filter_radar(src_img):
 	im = src_img.convert('RGB')
 	pixels = im.load()
@@ -708,7 +720,8 @@ class GeocodedRadar:
 		xOffset = abs(int((lat-xOrigin) / pixelWidth)) # XXX remove abs
 		yOffset = abs(int((lng-yOrigin) / pixelHeight))
 		
-		return (xOffset, yOffset), tuple((int(b[xOffset,yOffset]) for b in self.bands.itervalues()))
+		# x and y in these coordinates are switched for some reason?
+		return (yOffset, xOffset), tuple((int(b[xOffset,yOffset]) for b in self.bands.itervalues()))
 	
 	def get_rain_at_coords(self, lat, lng):
 		position, pixel = self.get_pixel_at_coords(lat, lng)

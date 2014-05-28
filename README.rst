@@ -57,7 +57,8 @@ radar
   vsebuje informacije o padavinah
 
 rain_level
-  je eno izmed 0 (bela), 25 (zelena), 50 (rumena), 75 (oranžna) ali 100 (rdeča)
+  jakost padavin v relativnih enotah iz radarske slike pred majem 2014 - je eno
+  izmed 0 (bela), 25 (zelena), 50 (rumena), 75 (oranžna) ali 100 (rdeča)
 
 rain_mmph
   jakost padavin v milimetrih na uro
@@ -109,6 +110,7 @@ offset
         "updated_text": "2011-10-22 19:39",
         "updated": 1319305162,
         "rain_level": 0,
+        "rain_mmph": 0,
         "x": 99
     },
     "lat": "47.05",

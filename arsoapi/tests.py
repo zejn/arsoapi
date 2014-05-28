@@ -3,22 +3,47 @@ import datetime
 import os
 import unittest
 
-from arsoapi.models import RadarPadavin, GeocodedRadar, Aladin, GeocodedAladin
+from arsoapi.models import RadarPadavin, GeocodedRadar, Aladin, GeocodedAladin, mmph_to_level
 
 
 datafile = lambda x: os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', x))
 
 class TestVreme(unittest.TestCase):
+	def test_mmph_to_level(self):
+		self.assertEqual(mmph_to_level(0.0), 0)
+		self.assertEqual(mmph_to_level(0.5), 25)
+		self.assertEqual(mmph_to_level(2.5), 50)
+		self.assertEqual(mmph_to_level(15.), 75)
+		self.assertEqual(mmph_to_level(60.), 100)
+		self.assertEqual(mmph_to_level(1000.), 100)
+
 	def test01_radar(self):
-		img_data = open(datafile('test01_radar.gif')).read()
+		img_data = open(datafile('test_sirad_si1_si2.gif')).read()
 		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
 		r.save()
+		r.process()
+
 		gr = GeocodedRadar()
 		gr.load_from_model(r)
-		
+
+		# koper
+		pos, rain_mmph = gr.get_rain_at_coords(45.547356,13.729792)
+		self.assertEqual(pos, (294, 357))
+		self.assertEqual(rain_mmph, 0)
+
+		# ljubljana
+		pos, rain_mmph = gr.get_rain_at_coords(46.054173,14.507332)
+		self.assertEqual(pos, (428, 270))
+		self.assertEqual(rain_mmph, 0)
+
+		# maribor
+		pos, rain_mmph = gr.get_rain_at_coords(46.554611,15.646534)
+		self.assertEqual(pos, (624, 184))
+		self.assertEqual(rain_mmph, 0)
+
 		pos, rain_level = gr.get_rain_at_coords(45.545763, 14.106696)
-		self.assertEqual(pos, (358, 361), 'Pixel coords are off?')
-		self.assertEqual(rain_level, 100, 'Rain not a 100% where it should be')
+		self.assertEqual(pos, (359, 357)) # 'Pixel coords are off?')
+		self.assertEqual(rain_level, .5)
 		
 		del gr
 		r.delete()
