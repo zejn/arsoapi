@@ -556,21 +556,34 @@ def filter_aladin_old(src_img):
 	
 	return im
 
-def annotate_geo_radar(img):
+def annotate_geo_radar(img, scale=1):
 	if LOG_LEVEL:
 		print 'ANN radar: Annotating'
 	src = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar1_', suffix='.tif')
 	tmp = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar2_', suffix='.tif')
 	dst = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar3_', suffix='.tif')
+	if scale != 1:
+		img = img.resize((img.size[0]*scale, img.size[1]*scale))
+
 	img.save(src.name, 'tiff')
 	src.flush()
 	
 	if LOG_LEVEL:
 		print 'ANN radar: gdal translate'
 	# magic numbers, geocoded pixels
+	GCP = (		(250, 245, 401712, 154018),
+			(624, 214, 589532, 169167),
+			(506, 478, 530526, 38229) )
+
+	cmd = []
+
 	# syntax: -gcp x y east north
-	cmd = '-gcp 250 245 401712 154018 -gcp 624 214 589532 169167 -gcp 506 478 530526 38229 -a_srs EPSG:3787'.split(' ')
-	p = popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
+	for x, y, east, north in GCP:
+		cmd += ["-gcp"] + map(str, [x*scale, y*scale, east, north])
+
+	cmd += ["-a_srs", "EPSG:3787", src.name, tmp.name]
+
+	p = popen([GDAL_TRANSLATE] + cmd)
 	p.wait()
 	check_popen_error(p)
 	

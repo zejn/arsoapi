@@ -105,14 +105,14 @@ def image_radar(request):
 def align_radar(request):
 	r = RadarPadavin.objects.all()[0]
 
-	geotiff = annotate_geo_radar(r.pic)
+	geotiff = annotate_geo_radar(r.pic, scale=4)
 
 	img = Image.open(StringIO(geotiff)).convert('RGBA')
 
 	a = numpy.array(numpy.asarray(img))
 
 	d = (a[:,:,0] == RADAR_CRTE[0]) & (a[:,:,1] == RADAR_CRTE[1]) & (a[:,:,2] == RADAR_CRTE[2])
-	a[d,3] = 255
+	a[d,3] = 200
 	a[~d,3] = 0
 
 	return _png_image_fromarray(a)
