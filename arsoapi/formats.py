@@ -9,6 +9,8 @@ class RadarImageFormat():
 
 	GCP = ()
 
+	def __init__(self):
+		self.COLOR_TO_MMPH[self.COLOR_BG] = 0.
 
 class SIRAD(RadarImageFormat):
 	ID = 1
@@ -20,7 +22,6 @@ class SIRAD(RadarImageFormat):
 	) )
 
 	COLOR_TO_MMPH = {
-		(255, 255, 255):	   .0,
 		( 25, 185,   0):	   .5,
 		(250, 225,   0):	  2.0,
 		(250, 125,   0):	 15.0,
@@ -44,7 +45,6 @@ class SIRAD_SI1SI2(RadarImageFormat):
 	) )
 
 	COLOR_TO_MMPH = {
-		(255, 255, 255):	.0,
 		(  0, 125,   0):	.2, # interp.
 		( 50, 150,   0):	.5,
 		(100, 175,   0):	.7, # interp.
@@ -74,7 +74,6 @@ class SIRAD_SI1SI2_B(SIRAD_SI1SI2):
 	SOURCE = "ARSO SIRAD SI1 SI2 B"
 
 	COLOR_TO_MMPH = {
-		(255, 255, 255):	.0,
 		(  8,  70, 254):	.2,
 		(  0, 120, 254):	.5,
 		(  0, 174, 253):	.7,
