@@ -3,12 +3,23 @@ import datetime
 import os
 import unittest
 
-from arsoapi.models import RadarPadavin, GeocodedRadar, Aladin, GeocodedAladin, mmph_to_level
-from arsoapi.formats import radar_detect_format
+from arsoapi.models import RadarPadavin, GeocodedRadar, Aladin, GeocodedAladin, mmph_to_level, filter_radar
+from arsoapi.formats import radar_detect_format, radar_get_format
 
 from PIL import Image
 
 datafile = lambda x: os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', x))
+
+class TestRadarFilter(unittest.TestCase):
+	def test_filter(self):
+		img = Image.open(open(datafile('test_radar_filter.gif')))
+		fmt = radar_get_format(3)
+
+		img2 = filter_radar(img, fmt)
+
+		self.assertEqual(img2.getpixel((8, 1)), (255, 255, 255))
+		self.assertEqual(img2.getpixel((4, 5)), (255, 255, 255))
+		self.assertEqual(img2.getpixel((1, 8)), (0, 120, 254))
 
 class TestRadarFormat(unittest.TestCase):
 	def test_detect_1(self):
