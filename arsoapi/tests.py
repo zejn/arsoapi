@@ -29,6 +29,13 @@ class TestRadarFormat(unittest.TestCase):
 
 		self.assertEqual(fmt.ID, 3)
 
+	def test_detect_invalid(self):
+		img = Image.open(open(datafile('test_invalid.gif')))
+		fmt = radar_detect_format(img)
+
+		self.assertEqual(fmt.ID, 0)
+
+
 class TestVreme(unittest.TestCase):
 	def test_mmph_to_level(self):
 		self.assertEqual(mmph_to_level(0.0), 0)
@@ -68,7 +75,39 @@ class TestVreme(unittest.TestCase):
 		
 		del gr
 		r.delete()
-	
+
+	def test01_radar_unknown_format(self):
+		img_data = open(datafile('test_invalid.gif')).read()
+		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
+		r.save()
+		r.process()
+
+		gr = GeocodedRadar()
+		gr.load_from_model(r)
+
+		pos, rain_mmph = gr.get_rain_at_coords(45.545763, 14.106696)
+		self.assertTrue(rain_mmph is None)
+
+		del gr
+		r.delete()
+
+	def test01_radar_old_db(self):
+		img_data = open(datafile('test_sirad_si1_si2.gif')).read()
+		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
+		r.save()
+		r.process()
+		r.format_id = None
+		r.save()
+
+		gr = GeocodedRadar()
+		gr.load_from_model(r)
+
+		pos, rain_mmph = gr.get_rain_at_coords(45.545763, 14.106696)
+		self.assertTrue(rain_mmph is None)
+
+		del gr
+		r.delete()
+
 	def test02_aladin(self):
 		today = datetime.date.today()
 		for n in (6,12,18,24,30,36,42,48):

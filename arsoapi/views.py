@@ -15,9 +15,9 @@ from arsoapi.models import (
 	GeocodedRadar, GeocodedToca, GeocodedAladin,
 	RadarPadavin, Toca, Aladin,
 	mmph_to_level,
-	WHITE, RADAR_CRTE,
 	annotate_geo_radar,
 	)
+from arsoapi.formats import radar_get_format
 
 from osgeo import gdal
 import osgeo.gdalconst as gdalc
@@ -106,12 +106,15 @@ def align_radar(request):
 	r = RadarPadavin.objects.all()[0]
 
 	geotiff = annotate_geo_radar(r.pic, scale=4)
+	fmt = radar_get_format(r.format_id)
 
 	img = Image.open(StringIO(geotiff)).convert('RGBA')
 
 	a = numpy.array(numpy.asarray(img))
+	d = numpy.zeros(a.shape[:2], dtype=numpy.bool)
+	for c in fmt.COLOR_IGNORE:
+		d |= (a[:,:,0] == c[0]) & (a[:,:,1] == c[1]) & (a[:,:,2] == c[2])
 
-	d = (a[:,:,0] == RADAR_CRTE[0]) & (a[:,:,1] == RADAR_CRTE[1]) & (a[:,:,2] == RADAR_CRTE[2])
 	a[d,3] = 200
 	a[~d,3] = 0
 
@@ -169,10 +172,14 @@ def _png_image(model):
 	model.processed.open()
 	img = Image.open(model.processed).convert('RGBA')
 
+	fmt = radar_get_format(model.format_id)
+
 	a = numpy.array(numpy.asarray(img))
 
 	# select white color
-	d = (a[:,:,0] == WHITE[0]) & (a[:,:,1] == WHITE[1]) & (a[:,:,2] == WHITE[2])
+	d =	(a[:,:,0] == fmt.COLOR_BG[0]) & \
+		(a[:,:,1] == fmt.COLOR_BG[1]) & \
+		(a[:,:,2] == fmt.COLOR_BG[2])
 
 	# make white pixels completely transparent
 	a[d,3] = 0
