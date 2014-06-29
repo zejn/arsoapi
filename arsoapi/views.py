@@ -15,7 +15,8 @@ from arsoapi.models import (
 	GeocodedRadar, GeocodedToca, GeocodedAladin,
 	RadarPadavin, Toca, Aladin,
 	mmph_to_level,
-	WHITE
+	WHITE, RADAR_CRTE,
+	annotate_geo_radar,
 	)
 
 from osgeo import gdal
@@ -101,6 +102,21 @@ def image_radar(request):
 	r = RadarPadavin.objects.all()[0]
 	return _png_image(r)
 
+def align_radar(request):
+	r = RadarPadavin.objects.all()[0]
+
+	geotiff = annotate_geo_radar(r.pic)
+
+	img = Image.open(StringIO(geotiff)).convert('RGBA')
+
+	a = numpy.array(numpy.asarray(img))
+
+	d = (a[:,:,0] == RADAR_CRTE[0]) & (a[:,:,1] == RADAR_CRTE[1]) & (a[:,:,2] == RADAR_CRTE[2])
+	a[d,3] = 255
+	a[~d,3] = 0
+
+	return _png_image_fromarray(a)
+
 def image_aladin(request, offset):
 	a = Aladin.objects.all()[0]
 	real = Aladin.objects.filter(forecast_time=a.forecast_time, timedelta=offset)[0]
@@ -120,12 +136,20 @@ def _kml_file(model):
 	return dict(zip(('north', 'south', 'east', 'west'), values))
 
 def kml_radar(request):
+	if request.GET.get('align'):
+		image_view = 'arsoapi.views.image_radar'
+	else:
+		image_view = 'arsoapi.views.align_radar'
+
+	return _kml_radar(request, reverse(image_view))
+
+def _kml_radar(request, image_url):
 	m = geocoded_radar
 	m.refresh()
 	context = _kml_file(m)
 	context.update({
 		'host': request.META.get('HTTP_HOST', 'localhost'),
-		'image_url': reverse('arsoapi.views.image_radar'),
+		'image_url': image_url,
 		'description': 'Radarska slika padavin',
 		})
 	return render_to_response('template.kml', context)
@@ -155,6 +179,9 @@ def _png_image(model):
 	# make non-white pixels partially transparent
 	a[~d,3] = 128
 
+	return _png_image_fromarray(a)
+
+def _png_image_fromarray(a):
 	s = StringIO()
 	img = Image.fromarray(a, mode='RGBA')
 	img.save(s, 'png')
