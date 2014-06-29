@@ -111,7 +111,12 @@ class TestVreme(unittest.TestCase):
 	def test02_aladin(self):
 		today = datetime.date.today()
 		for n in (6,12,18,24,30,36,42,48):
-			img_data = open(datafile('test02_aladin_%.2d.png' % n)).read()
+			path = datafile('test02_aladin_%.2d.png' % n)
+			try:
+				img_data = open(path).read()
+			except IOError:
+				self.skipTest("%s missing" % (path,))
+
 			a = Aladin(
 				date=today,
 				last_modified=datetime.datetime.now(),
