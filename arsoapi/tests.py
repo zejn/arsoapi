@@ -4,9 +4,30 @@ import os
 import unittest
 
 from arsoapi.models import RadarPadavin, GeocodedRadar, Aladin, GeocodedAladin, mmph_to_level
+from arsoapi.formats import radar_detect_format
 
+from PIL import Image
 
 datafile = lambda x: os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', x))
+
+class TestRadarFormat(unittest.TestCase):
+	def test_detect_1(self):
+		img = Image.open(open(datafile('test_sirad.gif')))
+		fmt = radar_detect_format(img)
+
+		self.assertEqual(fmt.ID, 1)
+
+	def test_detect_2(self):
+		img = Image.open(open(datafile('test_sirad_si1_si2.gif')))
+		fmt = radar_detect_format(img)
+
+		self.assertEqual(fmt.ID, 2)
+
+	def test_detect_3(self):
+		img = Image.open(open(datafile('test_sirad_si1_si2_b.gif')))
+		fmt = radar_detect_format(img)
+
+		self.assertEqual(fmt.ID, 3)
 
 class TestVreme(unittest.TestCase):
 	def test_mmph_to_level(self):
