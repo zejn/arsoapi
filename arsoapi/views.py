@@ -104,9 +104,9 @@ def image_radar(request):
 
 def align_radar(request):
 	r = RadarPadavin.objects.all()[0]
-
-	geotiff = annotate_geo_radar(r.pic, scale=4)
 	fmt = radar_get_format(r.format_id)
+
+	geotiff = annotate_geo_radar(r.pic, fmt, scale=4)
 
 	img = Image.open(StringIO(geotiff)).convert('RGBA')
 

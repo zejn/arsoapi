@@ -98,9 +98,11 @@ class RadarPadavin(models.Model):
 		fmt = radar_detect_format(pic)
 		self.format_id = fmt.ID
 
-		filtered = filter_radar(self.pic, fmt)
-		geotiff = annotate_geo_radar(filtered)
-		self.processed.save(name=self.image_name(), content=ContentFile(geotiff))
+		if self.format_id > 0:
+			filtered = filter_radar(self.pic, fmt)
+			geotiff = annotate_geo_radar(filtered, fmt)
+			self.processed.save(name=self.image_name(), content=ContentFile(geotiff))
+
 		self.save()
 
 class Toca(models.Model):
@@ -543,7 +545,7 @@ def filter_aladin_old(src_img):
 	
 	return im
 
-def annotate_geo_radar(img, scale=1):
+def annotate_geo_radar(img, fmt, scale=1):
 	if LOG_LEVEL:
 		print 'ANN radar: Annotating'
 	src = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar1_', suffix='.tif')
@@ -557,15 +559,12 @@ def annotate_geo_radar(img, scale=1):
 	
 	if LOG_LEVEL:
 		print 'ANN radar: gdal translate'
-	# magic numbers, geocoded pixels
-	GCP = (		(250, 245, 401712, 154018),
-			(624, 214, 589532, 169167),
-			(506, 478, 530526, 38229) )
 
 	cmd = []
 
+	# magic numbers, geocoded pixels
 	# syntax: -gcp x y east north
-	for x, y, east, north in GCP:
+	for x, y, east, north in fmt.GCP:
 		cmd += ["-gcp"] + map(str, [x*scale, y*scale, east, north])
 
 	cmd += ["-a_srs", "EPSG:3787", src.name, tmp.name]
@@ -669,6 +668,7 @@ class GeocodedRadar:
 		self.bands = {}
 		self.last_modified = None
 		self.fmt = radar_get_format(0)
+		self.clean()
 	
 	def refresh(self):
 		r = RadarPadavin.objects.exclude(processed=None)[0]
@@ -676,9 +676,10 @@ class GeocodedRadar:
 			self.load_from_model(r)
 	
 	def load_from_model(self, instance):
-		self.load_from_string(instance.processed.read())
-		self.last_modified = instance.last_modified
-		self.fmt = radar_get_format(instance.format_id)
+		if instance.format_id > 0:
+			self.fmt = radar_get_format(instance.format_id)
+			self.load_from_string(instance.processed.read())
+			self.last_modified = instance.last_modified
 	
 	def load_from_string(self, data):
 		self.tmpfile = None # clear reference
@@ -713,6 +714,9 @@ class GeocodedRadar:
 			self.bands[i+1] = band.ReadAsArray(0, 0, self.cols, self.rows)
 	
 	def get_pixel_at_coords(self, lat, lng):
+		if self.transform is None:
+			return (0, 0), None
+
 		yOrigin = self.transform[0]
 		xOrigin = self.transform[3]
 		pixelWidth = self.transform[1]
