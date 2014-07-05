@@ -140,10 +140,9 @@ def _kml_file(model):
 
 def kml_radar(request):
 	if request.GET.get('align'):
-		image_view = 'arsoapi.views.image_radar'
-	else:
 		image_view = 'arsoapi.views.align_radar'
-
+	else:
+		image_view = 'arsoapi.views.image_radar'
 	return _kml_radar(request, reverse(image_view))
 
 def _kml_radar(request, image_url):
