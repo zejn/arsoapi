@@ -33,5 +33,9 @@
 			<rotation>   0.00</rotation>
 		</LatLonBox>
 	</GroundOverlay>
+
+	<NetworkLinkControl>
+		<expires>{{ expires }}</expires>
+	<NetworkLinkControl>
 </Document>
 </kml>

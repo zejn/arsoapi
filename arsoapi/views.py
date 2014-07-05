@@ -154,6 +154,7 @@ def _kml_radar(request, image_url):
 		'host': request.META.get('HTTP_HOST', 'localhost'),
 		'image_url': image_url,
 		'description': 'Radarska slika padavin',
+		'expires': datetime.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z',
 		})
 	return render_to_response('template.kml', context)
 
@@ -165,6 +166,7 @@ def kml_toca(request):
 		'host': request.META.get('HTTP_HOST', 'localhost'),
 		'image_url': reverse('arsoapi.views.image_toca'),
 		'description': 'Verjetnost toce',
+		'expires': datetime.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z',
 		})
 	return render_to_response('template.kml', context)
 
