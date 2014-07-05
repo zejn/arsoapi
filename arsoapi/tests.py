@@ -3,10 +3,49 @@ import datetime
 import os
 import unittest
 
-from arsoapi.models import RadarPadavin, GeocodedRadar, Aladin, GeocodedAladin, mmph_to_level
+from arsoapi.models import RadarPadavin, GeocodedRadar, Aladin, GeocodedAladin, mmph_to_level, filter_radar
+from arsoapi.formats import radar_detect_format, radar_get_format
 
+from PIL import Image
 
 datafile = lambda x: os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', x))
+
+class TestRadarFilter(unittest.TestCase):
+	def test_filter(self):
+		img = Image.open(open(datafile('test_radar_filter.gif')))
+		fmt = radar_get_format(3)
+
+		img2 = filter_radar(img, fmt)
+
+		self.assertEqual(img2.getpixel((8, 1)), (255, 255, 255))
+		self.assertEqual(img2.getpixel((4, 5)), (255, 255, 255))
+		self.assertEqual(img2.getpixel((1, 8)), (0, 120, 254))
+
+class TestRadarFormat(unittest.TestCase):
+	def test_detect_1(self):
+		img = Image.open(open(datafile('test_sirad.gif')))
+		fmt = radar_detect_format(img)
+
+		self.assertEqual(fmt.ID, 1)
+
+	def test_detect_2(self):
+		img = Image.open(open(datafile('test_sirad_si1_si2.gif')))
+		fmt = radar_detect_format(img)
+
+		self.assertEqual(fmt.ID, 2)
+
+	def test_detect_3(self):
+		img = Image.open(open(datafile('test_sirad_si1_si2_b.gif')))
+		fmt = radar_detect_format(img)
+
+		self.assertEqual(fmt.ID, 3)
+
+	def test_detect_invalid(self):
+		img = Image.open(open(datafile('test_invalid.gif')))
+		fmt = radar_detect_format(img)
+
+		self.assertEqual(fmt.ID, 0)
+
 
 class TestVreme(unittest.TestCase):
 	def test_mmph_to_level(self):
@@ -47,11 +86,48 @@ class TestVreme(unittest.TestCase):
 		
 		del gr
 		r.delete()
-	
+
+	def test01_radar_unknown_format(self):
+		img_data = open(datafile('test_invalid.gif')).read()
+		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
+		r.save()
+		r.process()
+
+		gr = GeocodedRadar()
+		gr.load_from_model(r)
+
+		pos, rain_mmph = gr.get_rain_at_coords(45.545763, 14.106696)
+		self.assertTrue(rain_mmph is None)
+
+		del gr
+		r.delete()
+
+	def test01_radar_old_db(self):
+		img_data = open(datafile('test_sirad_si1_si2.gif')).read()
+		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
+		r.save()
+		r.process()
+		r.format_id = None
+		r.save()
+
+		gr = GeocodedRadar()
+		gr.load_from_model(r)
+
+		pos, rain_mmph = gr.get_rain_at_coords(45.545763, 14.106696)
+		self.assertTrue(rain_mmph is None)
+
+		del gr
+		r.delete()
+
 	def test02_aladin(self):
 		today = datetime.date.today()
 		for n in (6,12,18,24,30,36,42,48):
-			img_data = open(datafile('test02_aladin_%.2d.png' % n)).read()
+			path = datafile('test02_aladin_%.2d.png' % n)
+			try:
+				img_data = open(path).read()
+			except IOError:
+				self.skipTest("%s missing" % (path,))
+
 			a = Aladin(
 				date=today,
 				last_modified=datetime.datetime.now(),

@@ -15,8 +15,9 @@ from arsoapi.models import (
 	GeocodedRadar, GeocodedToca, GeocodedAladin,
 	RadarPadavin, Toca, Aladin,
 	mmph_to_level,
-	WHITE
+	annotate_geo_radar,
 	)
+from arsoapi.formats import radar_get_format
 
 from osgeo import gdal
 import osgeo.gdalconst as gdalc
@@ -101,6 +102,24 @@ def image_radar(request):
 	r = RadarPadavin.objects.all()[0]
 	return _png_image(r)
 
+def align_radar(request):
+	r = RadarPadavin.objects.all()[0]
+	fmt = radar_get_format(r.format_id)
+
+	geotiff = annotate_geo_radar(r.pic, fmt, scale=4)
+
+	img = Image.open(StringIO(geotiff)).convert('RGBA')
+
+	a = numpy.array(numpy.asarray(img))
+	d = numpy.zeros(a.shape[:2], dtype=numpy.bool)
+	for c in fmt.COLOR_IGNORE:
+		d |= (a[:,:,0] == c[0]) & (a[:,:,1] == c[1]) & (a[:,:,2] == c[2])
+
+	a[d,3] = 200
+	a[~d,3] = 0
+
+	return _png_image_fromarray(a)
+
 def image_aladin(request, offset):
 	a = Aladin.objects.all()[0]
 	real = Aladin.objects.filter(forecast_time=a.forecast_time, timedelta=offset)[0]
@@ -120,12 +139,20 @@ def _kml_file(model):
 	return dict(zip(('north', 'south', 'east', 'west'), values))
 
 def kml_radar(request):
+	if request.GET.get('align'):
+		image_view = 'arsoapi.views.image_radar'
+	else:
+		image_view = 'arsoapi.views.align_radar'
+
+	return _kml_radar(request, reverse(image_view))
+
+def _kml_radar(request, image_url):
 	m = geocoded_radar
 	m.refresh()
 	context = _kml_file(m)
 	context.update({
 		'host': request.META.get('HTTP_HOST', 'localhost'),
-		'image_url': reverse('arsoapi.views.image_radar'),
+		'image_url': image_url,
 		'description': 'Radarska slika padavin',
 		})
 	return render_to_response('template.kml', context)
@@ -145,16 +172,23 @@ def _png_image(model):
 	model.processed.open()
 	img = Image.open(model.processed).convert('RGBA')
 
+	fmt = radar_get_format(model.format_id)
+
 	a = numpy.array(numpy.asarray(img))
 
 	# select white color
-	d = (a[:,:,0] == WHITE[0]) & (a[:,:,1] == WHITE[1]) & (a[:,:,2] == WHITE[2])
+	d =	(a[:,:,0] == fmt.COLOR_BG[0]) & \
+		(a[:,:,1] == fmt.COLOR_BG[1]) & \
+		(a[:,:,2] == fmt.COLOR_BG[2])
 
 	# make white pixels completely transparent
 	a[d,3] = 0
 	# make non-white pixels partially transparent
 	a[~d,3] = 128
 
+	return _png_image_fromarray(a)
+
+def _png_image_fromarray(a):
 	s = StringIO()
 	img = Image.fromarray(a, mode='RGBA')
 	img.save(s, 'png')

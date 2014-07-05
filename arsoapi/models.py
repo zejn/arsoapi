@@ -14,6 +14,7 @@ from django.core.files.base import ContentFile
 
 from arsoapi.util import Counter, fetch
 from arsoapi.laplacian import laplacian
+from arsoapi.formats import radar_detect_format, radar_get_format
 
 from osgeo import gdal
 import osgeo.gdalconst as gdalc
@@ -68,6 +69,7 @@ class RadarPadavin(models.Model):
 	timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 	last_modified = models.DateTimeField(db_index=True, unique=True)
 	picdata = models.TextField()
+	format_id = models.IntegerField(null=True)
 	processed = models.FileField(upload_to='processed/radar', null=True, blank=True)
 	
 	class Meta:
@@ -91,9 +93,16 @@ class RadarPadavin(models.Model):
 		return 'radar_%s.tif' % (self.last_modified.strftime('%Y%m%d-%H%M%S'),)
 	
 	def process(self):
-		filtered = filter_radar(self.pic)
-		geotiff = annotate_geo_radar(filtered)
-		self.processed.save(name=self.image_name(), content=ContentFile(geotiff))
+		pic = self.pic
+
+		fmt = radar_detect_format(pic)
+		self.format_id = fmt.ID
+
+		if self.format_id > 0:
+			filtered = filter_radar(self.pic, fmt)
+			geotiff = annotate_geo_radar(filtered, fmt)
+			self.processed.save(name=self.image_name(), content=ContentFile(geotiff))
+
 		self.save()
 
 class Toca(models.Model):
@@ -183,28 +192,8 @@ def fetch_aladin(ft, n):
 	assert n % 3 == 0
 	return fetch(URL_VREME_ALADIN % (ft.strftime('%Y%m%d'), ft.strftime('%H%M'), n))
 
-RADAR_CRTE = (96,96,96)
-RADAR_KRIZ = (16,16,16)
 WHITE = (255,255,255)
 BLACK = (0, 0, 0)
-RADAR_DEZ = {
-	WHITE:				0,
-	(  8,  70, 254):		.2,
-	(  0, 120, 254):		.5,
-	(  0, 174, 253):		.7,
-	(  0, 220, 254):		1.0,
-	(  4, 216, 131):		1.5,
-	( 66, 235,  66):		2.0,
-	(108, 249,   0):		3.5,
-	(184, 250,   0):		5.0,
-	(249, 250,   0):		10.0,
-	(254, 198,   0):		15.0,
-	(254, 132,   0):		33.0,
-	(255,  62,   1):		50.0,
-	(211,   0,   0):		75.0,
-	(181,   3,   3):		100.0,
-	(203,   0, 204):		150.0,
-}
 
 def mmph_to_level(mmph):
 	if mmph < 0.1:
@@ -218,7 +207,7 @@ def mmph_to_level(mmph):
 	else:
 		return 100
 
-def filter_radar(src_img):
+def filter_radar(src_img, fmt):
 	im = src_img.convert('RGB')
 	pixels = im.load()
 	
@@ -227,15 +216,15 @@ def filter_radar(src_img):
 	for i in range(im.size[0]):
 		for j in range(im.size[1]):
 			cc[pixels[i,j]] += 1
-			if pixels[i,j] == RADAR_CRTE or pixels[i,j] == RADAR_KRIZ:
+			if pixels[i,j] in fmt.COLOR_IGNORE:
 				c = Counter()
 				for p in (pixels[i-1,j], pixels[i,j-1], pixels[i+1,j], pixels[i,j+1]):
-					if p in RADAR_DEZ.keys():
+					if p in fmt.COLOR_TO_MMPH:
 						c[p] += 1
 				if c.most_common():
 					pixels[i,j] = c.most_common(1)[0][0]
 				else:
-					pixels[i,j] = WHITE
+					pixels[i,j] = fmt.COLOR_BG
 	
 	return im
 
@@ -556,21 +545,31 @@ def filter_aladin_old(src_img):
 	
 	return im
 
-def annotate_geo_radar(img):
+def annotate_geo_radar(img, fmt, scale=1):
 	if LOG_LEVEL:
 		print 'ANN radar: Annotating'
 	src = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar1_', suffix='.tif')
 	tmp = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar2_', suffix='.tif')
 	dst = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar3_', suffix='.tif')
+	if scale != 1:
+		img = img.resize((img.size[0]*scale, img.size[1]*scale))
+
 	img.save(src.name, 'tiff')
 	src.flush()
 	
 	if LOG_LEVEL:
 		print 'ANN radar: gdal translate'
+
+	cmd = []
+
 	# magic numbers, geocoded pixels
 	# syntax: -gcp x y east north
-	cmd = '-gcp 250 245 401712 154018 -gcp 624 214 589532 169167 -gcp 506 478 530526 38229 -a_srs EPSG:3787'.split(' ')
-	p = popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
+	for x, y, east, north in fmt.GCP:
+		cmd += ["-gcp"] + map(str, [x*scale, y*scale, east, north])
+
+	cmd += ["-a_srs", "EPSG:3787", src.name, tmp.name]
+
+	p = popen([GDAL_TRANSLATE] + cmd)
 	p.wait()
 	check_popen_error(p)
 	
@@ -664,11 +663,12 @@ def convert_geotiff_to_png(tiffdata):
 	return dst.read()
 
 class GeocodedRadar:
-	RAIN_LEVEL = RADAR_DEZ
 	
 	def __init__(self):
 		self.bands = {}
 		self.last_modified = None
+		self.fmt = radar_get_format(0)
+		self.clean()
 	
 	def refresh(self):
 		r = RadarPadavin.objects.exclude(processed=None)[0]
@@ -676,8 +676,10 @@ class GeocodedRadar:
 			self.load_from_model(r)
 	
 	def load_from_model(self, instance):
-		self.load_from_string(instance.processed.read())
-		self.last_modified = instance.last_modified
+		if instance.format_id > 0:
+			self.fmt = radar_get_format(instance.format_id)
+			self.load_from_string(instance.processed.read())
+			self.last_modified = instance.last_modified
 	
 	def load_from_string(self, data):
 		self.tmpfile = None # clear reference
@@ -712,6 +714,9 @@ class GeocodedRadar:
 			self.bands[i+1] = band.ReadAsArray(0, 0, self.cols, self.rows)
 	
 	def get_pixel_at_coords(self, lat, lng):
+		if self.transform is None:
+			return (0, 0), None
+
 		yOrigin = self.transform[0]
 		xOrigin = self.transform[3]
 		pixelWidth = self.transform[1]
@@ -720,12 +725,17 @@ class GeocodedRadar:
 		xOffset = abs(int((lat-xOrigin) / pixelWidth)) # XXX remove abs
 		yOffset = abs(int((lng-yOrigin) / pixelHeight))
 		
+		try:
+			pixel = tuple((int(b[xOffset,yOffset]) for b in self.bands.itervalues()))
+		except IndexError:
+			pixel = None
+
 		# x and y in these coordinates are switched for some reason?
-		return (yOffset, xOffset), tuple((int(b[xOffset,yOffset]) for b in self.bands.itervalues()))
+		return (yOffset, xOffset), pixel
 	
 	def get_rain_at_coords(self, lat, lng):
 		position, pixel = self.get_pixel_at_coords(lat, lng)
-		return position, self.RAIN_LEVEL[pixel]
+		return position, self.fmt.COLOR_TO_MMPH.get(pixel)
 	
 
 class GeocodedToca:
