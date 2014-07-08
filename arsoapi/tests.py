@@ -1,4 +1,4 @@
-
+import glob
 import datetime
 import os
 import unittest
@@ -8,7 +8,14 @@ from arsoapi.formats import radar_detect_format, radar_get_format
 
 from PIL import Image
 
-datafile = lambda x: os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', x))
+def datafile(name):
+	path = os.path.join(os.path.dirname(__file__), 'data', name)
+	abspath = os.path.abspath(path)
+
+	if not os.path.exists(abspath):
+		raise unittest.SkipTest("%s missing" % (path,))
+
+	return abspath
 
 class TestRadarFilter(unittest.TestCase):
 	def test_filter(self):
@@ -120,35 +127,41 @@ class TestVreme(unittest.TestCase):
 		r.delete()
 
 	def test01_radar_coverage(self):
-		img_data = open(datafile('private/radar_20140708.gif')).read()
-		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
-		r.save()
-		r.process()
 
-		gr = GeocodedRadar()
-		gr.load_from_model(r)
+		pattern = os.path.join(os.path.dirname(__file__), 'data/private', '*')
 
-		for lat in xrange(45210, 47050+1, 10):
-			for lon in xrange(12920, 16710+1, 10):
-				lat_f = lat * 1e-3
-				lon_f = lon * 1e-3
-				pos, rain_mmph = gr.get_rain_at_coords(lat_f, lon_f)
+		for path in glob.glob(pattern):
 
-				self.assertTrue(rain_mmph is not None,
-						msg="get_rain_at_coords(%f, %f) is None (pos = %r)" % (
-							lat_f, lon_f, pos))
+			name = os.path.join("private", os.path.basename(path))
 
-		del gr
-		r.delete()
+			img_data = open(datafile(name)).read()
+			r = RadarPadavin(picdata=img_data.encode('base64'),
+					last_modified=datetime.datetime.now())
+			r.save()
+			r.process()
+
+			gr = GeocodedRadar()
+			gr.load_from_model(r)
+
+			for lat in xrange(45210, 47050+1, 10):
+				for lon in xrange(12920, 16710+1, 10):
+					lat_f = lat * 1e-3
+					lon_f = lon * 1e-3
+					pos, rain_mmph = gr.get_rain_at_coords(lat_f, lon_f)
+
+					self.assertTrue(rain_mmph is not None,
+							msg="get_rain_at_coords(%f, %f) is None "
+								"(%s, pos = %r)" % (
+								lat_f, lon_f, name, pos))
+
+			del gr
+			r.delete()
 
 	def test02_aladin(self):
 		today = datetime.date.today()
 		for n in (6,12,18,24,30,36,42,48):
 			path = datafile('test02_aladin_%.2d.png' % n)
-			try:
-				img_data = open(path).read()
-			except IOError:
-				self.skipTest("%s missing" % (path,))
+			img_data = open(path).read()
 
 			a = Aladin(
 				date=today,
