@@ -91,6 +91,29 @@ class SIRAD_SI1SI2_B(SIRAD_SI1SI2):
 		(203,   0, 204):	150.0,
 	}
 
+class SIRAD_SI1SI2_C(SIRAD_SI1SI2):
+	ID = 4
+
+	SOURCE = "ARSO SIRAD SI1 SI2 C"
+
+	COLOR_TO_MMPH = {
+		(  8,  90, 254):	.2,
+		(  0, 140, 254):	.5,
+		(  0, 174, 253):	.7,
+		(  0, 200, 254):	1.0,
+		(  4, 216, 131):	1.5,
+		( 66, 235,  66):	2.0,
+		(108, 249,   0):	3.5,
+		(184, 250,   0):	5.0,
+		(249, 250,   0):	10.0,
+		(254, 198,   0):	15.0,
+		(254, 132,   0):	33.0,
+		(255,  62,   1):	50.0,
+		(211,   0,   0):	75.0,
+		(181,   3,   3):	100.0,
+		(203,   0, 204):	150.0,
+	}
+
 def radar_get_format(id):
 	return _id_to_format.get(id, _id_to_format[0])
 
@@ -102,8 +125,12 @@ def radar_detect_format(img):
 		c = img.convert('RGB').getpixel((804, 32))
 		if c == (125, 0, 250):
 			return SIRAD_SI1SI2()
-		elif c == (203, 0, 204):
+
+		c = img.convert('RGB').getpixel((620, 32))
+		if c == (0, 120, 254):
 			return SIRAD_SI1SI2_B()
+		elif c == (0, 140, 254):
+			return SIRAD_SI1SI2_C()
 
 	return RadarImageFormat()
 

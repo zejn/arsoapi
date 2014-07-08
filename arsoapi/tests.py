@@ -119,6 +119,28 @@ class TestVreme(unittest.TestCase):
 		del gr
 		r.delete()
 
+	def test01_radar_coverage(self):
+		img_data = open(datafile('private/radar_20140708.gif')).read()
+		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
+		r.save()
+		r.process()
+
+		gr = GeocodedRadar()
+		gr.load_from_model(r)
+
+		for lat in xrange(45210, 47050+1, 10):
+			for lon in xrange(12920, 16710+1, 10):
+				lat_f = lat * 1e-3
+				lon_f = lon * 1e-3
+				pos, rain_mmph = gr.get_rain_at_coords(lat_f, lon_f)
+
+				self.assertTrue(rain_mmph is not None,
+						msg="get_rain_at_coords(%f, %f) is None (pos = %r)" % (
+							lat_f, lon_f, pos))
+
+		del gr
+		r.delete()
+
 	def test02_aladin(self):
 		today = datetime.date.today()
 		for n in (6,12,18,24,30,36,42,48):
