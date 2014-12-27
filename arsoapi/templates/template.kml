@@ -30,12 +30,12 @@
 			<south>{{ south }}</south>
 			<east>{{ east }}</east>
 			<west>{{ west }}</west>
-			<rotation>   0.00</rotation>
+			<rotation>0.00</rotation>
 		</LatLonBox>
 	</GroundOverlay>
 
 	<NetworkLinkControl>
 		<expires>{{ expires }}</expires>
-	<NetworkLinkControl>
+	</NetworkLinkControl>
 </Document>
 </kml>
