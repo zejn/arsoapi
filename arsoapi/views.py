@@ -43,9 +43,8 @@ def datetime_encoder(obj):
 
 def dump_data(model, day):
 	from django.db import connection
-	prevday = day
-	yday = prevday + datetime.timedelta(1)
-	the_day = datetime.datetime(prevday.year, prevday.month, prevday.day, 0, 0, 0)
+	yday = day + datetime.timedelta(1)
+	the_day = datetime.datetime(day.year, day.month, day.day, 0, 0, 0)
 	
 	qs = model.objects.filter(timestamp__gte=the_day, timestamp__lt=the_day + datetime.timedelta(1))
 	
