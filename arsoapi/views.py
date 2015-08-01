@@ -3,8 +3,9 @@ from django.shortcuts import render_to_response
 from django.http import HttpResponse, Http404
 from django.core.urlresolvers import reverse
 from django.utils._os import safe_join
+from django.utils.timezone import make_aware, utc
 from django.conf import settings
-from django.db import models
+from django.db import models, connection
 
 import datetime
 import os
@@ -41,55 +42,82 @@ def datetime_encoder(obj):
 	else:
 		raise TypeError, 'Object of type %s with value of %s is not JSON serializable' % (type(obj), repr(obj))
 
-def dump_data(model, day):
+def dump_data(model, day, use_new=True):
 	from django.db import connection
 	yday = day + datetime.timedelta(1)
 	the_day = datetime.datetime(day.year, day.month, day.day, 0, 0, 0)
 	
-	qs = model.objects.filter(timestamp__gte=the_day, timestamp__lt=the_day + datetime.timedelta(1))
-	
-	if qs.count() == 0:
-		return
-	
-	sql, params = qs.query.get_compiler('default').as_sql()
-	
-	class Dumper(list):
-		def __init__(self, sql, params):
-			self.cur = connection.cursor()
-			self.cur.execute(sql, params)
-			self.labels = [i[0] for i in self.cur.cursor.description]
-		
-		def __nonzero__(self):
-			return True
-		
-		def __iter__(self):
-			return self
-		
-		def next(self):
-			rec = self.cur.fetchone()
-			if rec is not None:
-				obj_data = dict(zip(self.labels, rec))
-				return obj_data
-			else:
-				raise StopIteration
-			
-	
-	dumper = Dumper(sql, params)
-	
 	dump_dir = safe_join(settings.DUMP_DIR, the_day.strftime('%Y-%m'))
-	dump_file = safe_join(dump_dir, the_day.strftime(model.__name__.lower() + '_%Y-%m-%d.json'))
-	
+
 	if not os.path.isdir(dump_dir):
 		os.makedirs(dump_dir)
-	
-	f = open(dump_file, 'w')
-	for frag in simplejson.JSONEncoder(default=datetime_encoder).iterencode(dumper):
-		f.write(frag)
-	f.close()
-	
-	os.system('/bin/gzip -9 %s' % dump_file)
-	
-	qs.delete()
+
+	if use_new and the_day >= datetime.datetime(2015, 7, 31):
+		# transition to utc timestamps
+		if the_day == datetime.datetime(2015, 7, 31):
+			start = the_day
+			end = make_aware(start, utc) + datetime.timedelta(1)
+		else:
+			start = make_aware(the_day, utc)
+			end = start + datetime.timedelta(1)
+
+		qs = model.objects.filter(timestamp__gte=start, timestamp__lt=end)
+		
+		if qs.count() == 0:
+			return
+
+		sql, params = qs.query.get_compiler('default').as_sql()
+		dump_file = safe_join(dump_dir, the_day.strftime(model.__name__.lower() + '_%Y-%m-%d.csv'))
+
+		cur = connection.cursor()
+		copy_sql = 'COPY (' + sql + ') TO stdout WITH CSV HEADER;'
+		full_sql = cur.cursor.mogrify(copy_sql, params)
+
+		f = open(dump_file, 'w')
+		cur.cursor.copy_expert(full_sql, f)
+		f.close()
+
+		os.system('/bin/gzip -9f %s' % dump_file)
+
+		qs.delete()
+	else:
+		qs = model.objects.filter(timestamp__gte=the_day, timestamp__lt=the_day + datetime.timedelta(1))
+		
+		if qs.count() == 0:
+			return
+
+		sql, params = qs.query.get_compiler('default').as_sql()
+		class Dumper(list):
+			def __init__(self, sql, params):
+				self.cur = connection.cursor()
+				self.cur.execute(sql, params)
+				self.labels = [i[0] for i in self.cur.cursor.description]
+			
+			def __nonzero__(self):
+				return True
+			
+			def __iter__(self):
+				return self
+			
+			def next(self):
+				rec = self.cur.fetchone()
+				if rec is not None:
+					obj_data = dict(zip(self.labels, rec))
+					return obj_data
+				else:
+					raise StopIteration
+				
+		dumper = Dumper(sql, params)
+		dump_file = safe_join(dump_dir, the_day.strftime(model.__name__.lower() + '_%Y-%m-%d.json'))
+		
+		f = open(dump_file, 'w')
+		for frag in simplejson.JSONEncoder(default=datetime_encoder).iterencode(dumper):
+			f.write(frag)
+		f.close()
+		
+		os.system('/bin/gzip -9 %s' % dump_file)
+		
+		qs.delete()
 
 def jsonresponse(func):
 	def _inner(*args, **kwargs):
