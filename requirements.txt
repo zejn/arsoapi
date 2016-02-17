@@ -1,5 +1,8 @@
-django==1.4.13
-
-# apt-get python-imaging python-gdal works better
-#GDAL
-#PIL
+Django==1.9.2
+psycopg2
+Pillow
+pytz
+# gdal on jessie
+GDAL==1.10.1
+simplejson
+numpy

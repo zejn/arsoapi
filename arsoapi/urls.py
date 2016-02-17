@@ -1,10 +1,10 @@
-from django.conf.urls.defaults import patterns, include, url
+from django.conf.urls import url
 
 # Uncomment the next two lines to enable the admin:
 # from django.contrib import admin
 # admin.autodiscover()
 
-urlpatterns = patterns('',
+urlpatterns = [
     # Examples:
     # url(r'^$', 'arsoapi.views.home', name='home'),
     # url(r'^arsoapi/', include('arsoapi.foo.urls')),
@@ -21,4 +21,4 @@ urlpatterns = patterns('',
     url(r'vreme/align/radar.png', 'arsoapi.views.align_radar'),
     url(r'vreme/image/toca.png', 'arsoapi.views.image_toca'),
     url(r'vreme/image/aladin_(?P<offset>\d+).png', 'arsoapi.views.image_aladin'),
-)
+]
