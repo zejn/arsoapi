@@ -122,7 +122,7 @@ def dump_data(model, day, use_new=True):
 def jsonresponse(func):
 	def _inner(*args, **kwargs):
 		jsondata = func(*args, **kwargs)
-		return HttpResponse(_dumps(jsondata), mimetype='application/json')
+		return HttpResponse(_dumps(jsondata), content_type='application/json')
 	return _inner
 
 def image_radar(request):
@@ -223,7 +223,7 @@ def _png_image_fromarray(a):
 	img = Image.fromarray(a, mode='RGBA')
 	img.save(s, 'png')
 	data = s.getvalue()
-	return HttpResponse(data, mimetype='image/png')
+	return HttpResponse(data, content_type='image/png')
 
 def tz2utc_diff():
 	now = datetime.datetime.now().replace(second=0, microsecond=0)
