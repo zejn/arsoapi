@@ -84,6 +84,9 @@ rain
 offset
   časovni odmik od napovedi v urah.
 
+**Primer zahtevka**
+
+https://opendata.si/vreme/report/?lat=47.05&lon=12.92
 
 **Primer vrnjenega rezultata**::
 
