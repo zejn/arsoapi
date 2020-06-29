@@ -22,7 +22,7 @@ import osgeo.gdalconst as gdalc
 # set to 1 to print out stuff
 LOG_LEVEL = getattr(settings, 'LOG_LEVEL', 0)
 
-URL_VREME_RADAR = 'http://www.arso.gov.si/vreme/napovedi%20in%20podatki/radar.gif'
+URL_VREME_RADAR = 'http://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm.gif'
 URL_VREME_TOCA  = 'http://www.meteo.si/uploads/probase/www/warning/graphic/warning_%s_hp_si.jpg'
 #URL_VREME_ALADIN = 'http://www.arso.gov.si/vreme/napovedi%%20in%%20podatki/aladin/AW00_oblpad_%.3d.png'
 URL_VREME_ALADIN = 'http://meteo.arso.gov.si/uploads/probase/www/model/aladin/field/as_%s-%s_tcc-rr_si-neighbours_%.3d.png'
