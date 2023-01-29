@@ -176,13 +176,13 @@ class TestVreme(unittest.TestCase):
 		ga.load_from_models(aladini)
 		
 		pos, forecast = ga.get_forecast_at_coords(45.545763, 14.106696)
-		print 'AAAAAAAAA', pos, pos
+		print('AAAAAAAAA', pos, pos)
 		self.assertEqual(pos, (321, 210))
 		rain30mm = [i for i in forecast if i['offset'] == 36][0]
 		self.assertEqual(rain30mm['rain'], 30)
 		
 		pos2, forecast2 = ga.get_forecast_at_coords(46.421411, 13.601732)
-		print 'EEEEEEEEEEEe', pos2
+		print('EEEEEEEEEEEe', pos2)
 		self.assertEqual(pos2, pos2)
 		rain30mm2 = [i for i in forecast if i['offset'] == 36][0]
 		#self.assertEqual(rain30mm2['rain'], 30, 'failed removing markers with rainfall numbers')

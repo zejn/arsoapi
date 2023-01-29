@@ -161,7 +161,7 @@ except ImportError:
         secret = open(here('djangosecret.py'),'w')
         secret.write("SECRET_KEY='%s'\n" % ''.join([choice('abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)') for i in range(50)]))
         secret.close()
-        print 'Generated new django SECRET_KEY.'
+        print('Generated new django SECRET_KEY.')
     generate_secret()
     from djangosecret import SECRET_KEY
 

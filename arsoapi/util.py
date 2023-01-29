@@ -1,4 +1,5 @@
-import urllib2
+from urllib.request import urlopen
+
 from operator import itemgetter as _itemgetter
 from datetime import datetime
 from email.utils import parsedate
@@ -15,10 +16,7 @@ def _parse_http_datetime(s):
 	return datetime(*parsedate(s)[:6])
 
 def fetch(url, postdata=None):
-	u = urllib2.urlopen(url, postdata)
+	u = urlopen(url, postdata)
 	obfuscated_data = u.read()
 	last_modified = _parse_http_datetime(u.headers.get('last-modified'))
 	return obfuscated_data, last_modified
-
-
-

@@ -1,12 +1,10 @@
-from django.conf.urls import url
+from django.urls import path, re_path
 
-# Uncomment the next two lines to enable the admin:
-# from django.contrib import admin
-# admin.autodiscover()
+from . import views
 
 urlpatterns = [
     # Examples:
-    # url(r'^$', 'arsoapi.views.home', name='home'),
+    # url(r'^$', views.home', name='home),
     # url(r'^arsoapi/', include('arsoapi.foo.urls')),
 
     # Uncomment the admin/doc line below to enable admin documentation:
@@ -14,11 +12,11 @@ urlpatterns = [
 
     # Uncomment the next line to enable the admin:
     # url(r'^admin/', include(admin.site.urls)),
-    url(r'vreme/report/', 'arsoapi.views.report'),
-    url(r'vreme/kml/radar.kml', 'arsoapi.views.kml_radar'),
-    url(r'vreme/kml/toca.kml', 'arsoapi.views.kml_toca'),
-    url(r'vreme/image/radar.png', 'arsoapi.views.image_radar'),
-    url(r'vreme/align/radar.png', 'arsoapi.views.align_radar'),
-    url(r'vreme/image/toca.png', 'arsoapi.views.image_toca'),
-    url(r'vreme/image/aladin_(?P<offset>\d+).png', 'arsoapi.views.image_aladin'),
+    path(r'vreme/report/', views.report),
+    path(r'vreme/kml/radar.kml', views.kml_radar),
+    path(r'vreme/kml/toca.kml', views.kml_toca),
+    path(r'vreme/image/radar.png', views.image_radar),
+    path(r'vreme/align/radar.png', views.align_radar),
+    path(r'vreme/image/toca.png', views.image_toca),
+    re_path(r'vreme/image/aladin_(?P<offset>\d+).png', views.image_aladin),
 ]

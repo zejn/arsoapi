@@ -1,34 +1,34 @@
 
 import _laplacian
 
-#print dir(_laplacian)
+# print(dir(_laplacian))
 from pprint import pprint
 
-import Image
-from cStringIO import StringIO
+from PIL import Image
+from io import BytesIO
 import re
 
 im = Image.open('b.png').convert('RGB')
 #im = Image.open('t2.ppm').convert('RGB')
-s = StringIO()
+s = BytesIO()
 im.save(s, 'ppm')
 
 ppm = s.getvalue()
 del s
 
 header_match = re.match('^P6\n(\d+)\s(\d+)\n(\d+)\n', ppm, re.M)
-print 'dim', header_match.groups()
+print('dim', header_match.groups())
 
 header, raw_data = ppm[:header_match.end()], ppm[header_match.end():]
 
 w, h = im.size
-print im.size
+print(im.size)
 
 #itt = iter((ord(i) for i in raw_data))
 #imgbytes = zip(itt, itt, itt)
 #pprint(imgbytes)
-print '='*10
-print 'Going in'
+print('='*10)
+print('Going in')
 
 result = _laplacian.ppm_laplacian(im.size, raw_data)
 

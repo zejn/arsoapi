@@ -92,22 +92,21 @@ def _py_laplacian(im):
 try:
 	import _laplacian
 	_laplacian.ppm_laplacian # this is foo!
-	
 
-except (ImportError, AttributeError), e:
-	print e
+except (ImportError, AttributeError) as e:
+	print(e)
 	_laplacian = None
 
 if _laplacian is None:
 	laplacian = _py_laplacian
 else:
 	#print 'Using C laplacian'
-	from cStringIO import StringIO
+	from io import BytesIO
 	import re
 	from PIL import Image
 	
 	def laplacian(im):
-		s = StringIO()
+		s = BytesIO()
 		im.save(s, 'ppm')
 		ppm = s.getvalue()
 		del s
@@ -117,7 +116,7 @@ else:
 		
 		result = _laplacian.ppm_laplacian(im.size, raw_data)
 		
-		s = StringIO()
+		s = BytesIO()
 		s.write(header)
 		s.write(result)
 		s.seek(0)

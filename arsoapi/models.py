@@ -5,7 +5,7 @@ import os
 import pytz
 import subprocess
 import tempfile
-from cStringIO import StringIO
+from io import BytesIO
 from itertools import chain
 
 from django.db import models
@@ -56,8 +56,8 @@ def popen(*args, **kwargs):
 def check_popen_error(p):
 	if p.returncode is not None:
 		if p.returncode != 0:
-			print p.stdout.read()
-			print p.stderr.read()
+			print(p.stdout.read())
+			print(p.stderr.read())
 
 class GeoDatasourceError(Exception): pass
 
@@ -77,18 +77,17 @@ class RadarPadavin(models.Model):
 	
 	def __unicode__(self):
 		return u'%s' % (self.last_modified.strftime('%Y%m%d-%H%M%S'),)
-	
-	def pic():
-		def fget(self):
-			if self.picdata:
-				return Image.open(StringIO(self.picdata.decode('base64')))
-		def fset(self, value):
-			s = StringIO()
-			value.save(s)
-			self.picdata = s.getvalue().encode('base64')
-		return fget, fset
-	pic = property(*pic())
-	
+
+	@property
+	def pic(self):
+		if self.picdata:
+			return Image.open(BytesIO(self.picdata.decode('base64')))
+	@pic.setter
+	def pic(self, value):
+		s = BytesIO()
+		value.save(s)
+		self.picdata = s.getvalue().encode('base64')
+
 	def image_name(self):
 		return 'radar_%s.tif' % (self.last_modified.strftime('%Y%m%d-%H%M%S'),)
 	
@@ -116,18 +115,18 @@ class Toca(models.Model):
 	
 	def __unicode__(self):
 		return u'%s' % self.last_modified.strftime('%Y%m%d-%H%M')
-	
-	def pic():
-		def fget(self):
-			if self.picdata:
-				return Image.open(StringIO(self.picdata.decode('base64')))
-		def fset(self, value):
-			s = StringIO()
-			value.save(s)
-			self.picdata = s.getvalue().encode('base64')
-		return fget, fset
-	pic = property(*pic())
-	
+
+	@property
+	def pic(self):
+		if self.picdata:
+			return Image.open(BytesIO(self.picdata.decode('base64')))
+
+	@pic.setter
+	def pic(self, value):
+		s = BytesIO()
+		value.save(s)
+		self.picdata = s.getvalue().encode('base64')
+
 	def image_name(self):
 		return 'toca_%s.tif' % (self.last_modified.strftime('%Y%m%d-%H%M%S'),)
 	
@@ -148,17 +147,17 @@ class Aladin(models.Model):
 		ordering = ('-forecast_time', '-timedelta')
 		unique_together = (('forecast_time', 'timedelta'),)
 	
-	def pic():
-		def fget(self):
-			if self.picdata:
-				return Image.open(StringIO(self.picdata.decode('base64')))
-		def fset(self, value):
-			s = StringIO()
-			value.save(s)
-			self.picdata = s.getvalue().encode('base64')
-		return fget, fset
-	pic = property(*pic())
-	
+	@property
+	def pic(self):
+		if self.picdata:
+			return Image.open(BytesIO(self.picdata.decode('base64')))
+
+	@pic.setter
+	def pic(self, value):
+		s = BytesIO()
+		value.save(s)
+		self.picdata = s.getvalue().encode('base64')
+
 	def image_name(self):
 		return 'aladin_%s_%s.tif' % (self.forecast_time.strftime('%Y%m%d-%H%M'), self.timedelta)
 	
@@ -325,7 +324,7 @@ ALADIN_PADAVINE = {
 	(9, 227, 174):   90,
 }
 
-ALADIN_VOTABLE = tuple([WHITE] + ALADIN_OBLACNOST.keys() + ALADIN_PADAVINE.keys())
+ALADIN_VOTABLE = tuple([WHITE] + list(ALADIN_OBLACNOST.keys()) + list(ALADIN_PADAVINE.keys()))
 ALADIN_DISTANCE = ALADIN_VOTABLE + (ALADIN_BACKGROUND, ALADIN_MORJE)
 
 def filter_aladin(src_img):
@@ -463,7 +462,7 @@ def filter_aladin_old(src_img):
 					pixels[i,j] = WHITE
 	
 	# remove number boxes
-	print 'removing'
+	print('removing')
 	# step 1: detect
 	pending_removal = {}
 	for i in range(1, im.size[0]):
@@ -511,7 +510,7 @@ def filter_aladin_old(src_img):
 			del this_pending[p]
 		
 		markers.append(marker)
-	print 'n markers', len(markers)
+	print('n markers', len(markers))
 	# step 3: find marker bounding box
 	bboxes = []
 	for m in markers:
@@ -540,14 +539,14 @@ def filter_aladin_old(src_img):
 				for j in xrange(min_y, max_y+1):
 					pixels[i,j] = the_color
 		else:
-			print 'simple fail'
+			print('simple fail')
 			pending_bboxes.append((min_x, max_x, min_y, max_y))
 	
 	return im
 
 def annotate_geo_radar(img, fmt, scale=1):
 	if LOG_LEVEL:
-		print 'ANN radar: Annotating'
+		print('ANN radar: Annotating')
 	src = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar1_', suffix='.tif')
 	tmp = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar2_', suffix='.tif')
 	dst = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='radar3_', suffix='.tif')
@@ -558,7 +557,7 @@ def annotate_geo_radar(img, fmt, scale=1):
 	src.flush()
 	
 	if LOG_LEVEL:
-		print 'ANN radar: gdal translate'
+		print('ANN radar: gdal translate')
 
 	cmd = []
 
@@ -574,20 +573,20 @@ def annotate_geo_radar(img, fmt, scale=1):
 	check_popen_error(p)
 	
 	if LOG_LEVEL:
-		print 'ANN radar: gdal warp'
+		print('ANN radar: gdal warp')
 	p = popen([GDAL_WARP] + '-s_srs EPSG:3787 -t_srs EPSG:4326'.split(' ') + [tmp.name, dst.name])
 	p.wait()
 	check_popen_error(p)
 	
 	if LOG_LEVEL:
-		print 'ANN radar: done'
+		print('ANN radar: done')
 	dst.seek(0)
 	processed = dst.read()
 	return processed
 
 def annotate_geo_toca(img):
 	if LOG_LEVEL:
-		print 'ANN toca: Annotating'
+		print('ANN toca: Annotating')
 	src = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='toca1_', suffix='.tif')
 	tmp = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='toca3_', suffix='.tif')
 	dst = tempfile.NamedTemporaryFile(mode='w+b', dir=settings.TEMPORARY_DIR, prefix='toca3_', suffix='.tif')
@@ -596,20 +595,20 @@ def annotate_geo_toca(img):
 	src.flush()
 	
 	if LOG_LEVEL:
-		print 'ANN toca: gdal translate'
+		print('ANN toca: gdal translate')
 	cmd = '-gcp 94 131 401712 154018 -gcp 542 97 589532 168167 -gcp 398 408 530526 38229 -a_srs EPSG:3787'.split(' ')
 	p = popen([GDAL_TRANSLATE] + cmd + [src.name, tmp.name])
 	p.wait()
 	check_popen_error(p)
 	
 	if LOG_LEVEL:
-		print 'ANN toca: gdal warp'
+		print('ANN toca: gdal warp')
 	p = popen([GDAL_WARP] + '-s_srs EPSG:3787 -t_srs EPSG:4326'.split(' ') + [tmp.name, dst.name])
 	p.wait()
 	check_popen_error(p)
 	
 	if LOG_LEVEL:
-		print 'ANN toca: done'
+		print('ANN toca: done')
 	dst.seek(0)
 	processed = dst.read()
 	return processed
@@ -617,7 +616,7 @@ def annotate_geo_toca(img):
 
 def annotate_geo_aladin(img):
 	if LOG_LEVEL:
-		print 'ANN aladin: Annotating'
+		print('ANN aladin: Annotating')
 	src = tempfile.NamedTemporaryFile(dir=settings.TEMPORARY_DIR, prefix='aladin1_', suffix='.tif')
 	tmp = tempfile.NamedTemporaryFile(dir=settings.TEMPORARY_DIR, prefix='aladin2_', suffix='.tif')
 	dst = tempfile.NamedTemporaryFile(dir=settings.TEMPORARY_DIR, prefix='aladin3_', suffix='.tif')
@@ -625,7 +624,7 @@ def annotate_geo_aladin(img):
 	src.flush()
 	
 	if LOG_LEVEL:
-		print 'ANN aladin: gdal translate'
+		print('ANN aladin: gdal translate')
 	# old aladin
 	#cmd = '-gcp 530 194 622883 149136 -gcp 360 408 530526 38229 -gcp 116 187 401712 154018 -a_srs EPSG:3787'.split(' ')
 	# magic numbers - geocoded pixels
@@ -636,13 +635,13 @@ def annotate_geo_aladin(img):
 	check_popen_error(p)
 	
 	if LOG_LEVEL:
-		print 'ANN aladin: gdal warp'
+		print('ANN aladin: gdal warp')
 	p = popen([GDAL_WARP] + '-s_srs EPSG:3787 -t_srs EPSG:4326'.split(' ') + [tmp.name, dst.name])
 	p.wait()
 	check_popen_error(p)
 	
 	if LOG_LEVEL:
-		print 'ANN aladin: done'
+		print('ANN aladin: done')
 	dst.seek(0)
 	processed = dst.read()
 	return processed
@@ -671,9 +670,14 @@ class GeocodedRadar:
 		self.clean()
 	
 	def refresh(self):
-		r = RadarPadavin.objects.exclude(processed=None)[0]
-		if self.last_modified != r.last_modified:
-			self.load_from_model(r)
+		radarji = RadarPadavin.objects.exclude(processed=None)
+		try:
+			r = radarji[0]
+		except IndexError:
+			return
+		else:
+			if self.last_modified != r.last_modified:
+				self.load_from_model(r)
 	
 	def load_from_model(self, instance):
 		if instance.format_id > 0:
@@ -746,7 +750,11 @@ class GeocodedToca:
 		self.last_modified = None
 	
 	def refresh(self):
-		t = Toca.objects.all()[0]
+		toca = Toca.objects.all()
+		try:
+			t = toca[0]
+		except IndexError:
+			return
 		if self.last_modified != t.last_modified:
 			self.load_from_model(t)
 	
@@ -814,7 +822,11 @@ class GeocodedAladin:
 	
 	def refresh(self):
 		ft = self.forecast_time.get(6, datetime.datetime.now() - datetime.timedelta(1))
-		a = Aladin.objects.all()[0]
+		aladin = Aladin.objects.all()
+		try:
+			a = aladin[0]
+		except IndexError:
+			return
 		if a.forecast_time > ft:
 			self.load_from_models(Aladin.objects.filter(forecast_time=a.forecast_time))
 	

@@ -258,7 +258,7 @@ PyObject * ppm_laplacian(PyObject *self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "(ii)S", &width, &height, &py_data))
 		return NULL;
 	dprint("Parsing data");
-	PyString_AsStringAndSize(py_data, &buffer, &datasize);
+	PyBytes_AsStringAndSize(py_data, &buffer, &datasize);
 	data = (unsigned char *)(buffer);
 	
 	dprint("width=%d", width);
@@ -296,25 +296,25 @@ void init_data(int x, int y, unsigned char * data)
 /******************* 
  * functions 
  *******************/
-static PyMethodDef _functions[] = {
+static PyMethodDef laplacian_methods[] = {
 	{"ppm_laplacian", (PyCFunction)ppm_laplacian, METH_VARARGS,
 	 "Calculate second degree laplacian edge detection on ppm."  },
 	{ NULL, NULL}
 };
 
 
-/* module init */
+static struct PyModuleDef laplacian_module = {
+    PyModuleDef_HEAD_INIT,
+    "laplacian",   /* name of module */
+    NULL, /* module documentation, may be NULL */
+    -1,       /* size of per-interpreter state of the module,
+                 or -1 if the module keeps state in global variables. */
+    laplacian_methods
+};
 
-#ifndef PyMODINIT_FUNC
-#ifdef WIN32
-#define PyMODINIT_FUNC void __declspec(dllexport)
-#else
-#define PyMODINIT_FUNC
-#endif
-#endif
 
-PyMODINIT_FUNC init_laplacian(void)
+PyMODINIT_FUNC PyInit__laplacian(void)
 {
-	Py_InitModule3("_laplacian", _functions, "Second degree Laplacian edge detection accelerator module.");
-
+	// Py_InitModule3("_laplacian", _functions, "Second degree Laplacian edge detection accelerator module.");
+    return PyModule_Create(&laplacian_module);
 }

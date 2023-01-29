@@ -1,7 +1,7 @@
-from cStringIO import StringIO
-from django.shortcuts import render_to_response
+from io import BytesIO
+from django.shortcuts import render
 from django.http import HttpResponse, Http404
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.utils._os import safe_join
 from django.utils.timezone import make_aware, utc
 from django.conf import settings
@@ -40,7 +40,7 @@ def datetime_encoder(obj):
 	elif isinstance(obj, models.fields.files.FieldFile):
 		return None
 	else:
-		raise TypeError, 'Object of type %s with value of %s is not JSON serializable' % (type(obj), repr(obj))
+		raise TypeError('Object of type %s with value of %s is not JSON serializable' % (type(obj), repr(obj)))
 
 def dump_data(model, day, use_new=True):
 	from django.db import connection
@@ -135,7 +135,7 @@ def align_radar(request):
 
 	geotiff = annotate_geo_radar(r.pic, fmt, scale=4)
 
-	img = Image.open(StringIO(geotiff)).convert('RGBA')
+	img = Image.open(BytesIO(geotiff)).convert('RGBA')
 
 	a = numpy.array(numpy.asarray(img))
 	d = numpy.zeros(a.shape[:2], dtype=numpy.bool)
@@ -183,7 +183,7 @@ def _kml_radar(request, image_url):
 		'description': 'Radarska slika padavin',
 		'expires': expires,
 		})
-	return render_to_response('template.kml', context)
+	return render('template.kml', context)
 
 def kml_toca(request):
 	m = geocoded_toca
@@ -196,7 +196,7 @@ def kml_toca(request):
 		'description': 'Verjetnost toce',
 		'expires': expires,
 		})
-	return render_to_response('template.kml', context)
+	return render('template.kml', context)
 
 def _png_image(model):
 	model.processed.open()
@@ -219,7 +219,7 @@ def _png_image(model):
 	return _png_image_fromarray(a)
 
 def _png_image_fromarray(a):
-	s = StringIO()
+	s = BytesIO()
 	img = Image.fromarray(a, mode='RGBA')
 	img.save(s, 'png')
 	data = s.getvalue()
