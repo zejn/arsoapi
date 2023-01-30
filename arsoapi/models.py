@@ -1,4 +1,5 @@
 
+import base64
 import datetime
 from PIL import Image
 import os
@@ -44,6 +45,11 @@ ALADIN_MEJE_FILE = os.path.join(os.path.dirname(__file__), 'meje.png')
 gdal.AllRegister()
 #print 'Gdal version', gdal.VersionInfo()
 
+
+class DataError(Exception):
+	pass
+
+
 def popen(*args, **kwargs):
 	"a wrapper in order to suppress messages if debug is set to false"
 	params = {}
@@ -81,12 +87,12 @@ class RadarPadavin(models.Model):
 	@property
 	def pic(self):
 		if self.picdata:
-			return Image.open(BytesIO(self.picdata.decode('base64')))
+			return Image.open(BytesIO(base64.b64decode(self.picdata)))
 	@pic.setter
 	def pic(self, value):
 		s = BytesIO()
 		value.save(s)
-		self.picdata = s.getvalue().encode('base64')
+		self.picdata = base64.b64encode(s.getvalue())
 
 	def image_name(self):
 		return 'radar_%s.tif' % (self.last_modified.strftime('%Y%m%d-%H%M%S'),)
@@ -119,13 +125,13 @@ class Toca(models.Model):
 	@property
 	def pic(self):
 		if self.picdata:
-			return Image.open(BytesIO(self.picdata.decode('base64')))
+			return Image.open(BytesIO(base64.b64decode(self.picdata)))
 
 	@pic.setter
 	def pic(self, value):
 		s = BytesIO()
 		value.save(s)
-		self.picdata = s.getvalue().encode('base64')
+		self.picdata = base64.b64encode(s.getvalue())
 
 	def image_name(self):
 		return 'toca_%s.tif' % (self.last_modified.strftime('%Y%m%d-%H%M%S'),)
@@ -150,13 +156,13 @@ class Aladin(models.Model):
 	@property
 	def pic(self):
 		if self.picdata:
-			return Image.open(BytesIO(self.picdata.decode('base64')))
+			return Image.open(BytesIO(base64.b64decode(self.picdata)))
 
 	@pic.setter
 	def pic(self, value):
 		s = BytesIO()
 		value.save(s)
-		self.picdata = s.getvalue().encode('base64')
+		self.picdata = base64.b64encode(s.getvalue())
 
 	def image_name(self):
 		return 'aladin_%s_%s.tif' % (self.forecast_time.strftime('%Y%m%d-%H%M'), self.timedelta)
@@ -195,6 +201,8 @@ WHITE = (255,255,255)
 BLACK = (0, 0, 0)
 
 def mmph_to_level(mmph):
+	if mmph is None:
+		return None
 	if mmph < 0.1:
 		return 0
 	if mmph <= 1.0:
@@ -238,14 +246,14 @@ def _imageop_divide(im, mask):
 	pixels = im.load()
 	mask_pix = mask.load()
 	
-	for i in xrange(im.size[0]):
-		for j in xrange(im.size[1]):
+	for i in range(im.size[0]):
+		for j in range(im.size[1]):
 			p = pixels[i,j]
 			m = mask_pix[i,j]
 			pixels[i,j] = (
-				256*p[0] / (m[0]+1),
-				256*p[1] / (m[1]+1),
-				256*p[2] / (m[2]+1),
+				int(256*p[0] / (m[0]+1)),
+				int(256*p[1] / (m[1]+1)),
+				int(256*p[2] / (m[2]+1)),
 				)
 
 def _nearest_color(p, palette, threshold):
@@ -273,16 +281,16 @@ def filter_toca(src_img):
 		(255,255,255): 0,
 		}
 	levels.update(TOCA_LEVELS)
-	for i in xrange(im.size[0]):
-		for j in xrange(im.size[1]):
+	for i in range(im.size[0]):
+		for j in range(im.size[1]):
 			p = pixels[i,j]
 			p2 = _nearest_color(p, levels, 80) # 80 here is pure empirical magic
 			if p2 != p:
 				pixels[i,j] = p2
 	
 	def _surroundings(i, j):
-		for a in xrange(i-1, i+2):
-			for b in xrange(j-1, j+2):
+		for a in range(i-1, i+2):
+			for b in range(j-1, j+2):
 				yield a, b
 	
 	for i in range(1, im.size[0]-1):
@@ -338,8 +346,8 @@ def filter_aladin(src_img):
 	_imageop_divide(im, mask)
 	
 	def _surroundings(i, j):
-		for a in xrange(i-2, i+3):
-			for b in xrange(j-2, j+3):
+		for a in range(i-2, i+3):
+			for b in range(j-2, j+3):
 				yield a, b
 	
 	# step 2: fix artefacts from previous step
@@ -390,7 +398,7 @@ def filter_aladin_old(src_img):
 				pixels[i,j] = WHITE
 	
 	# fix crosshair in LJ
-	for i,j in chain(((230, i) for i in xrange(279, 291)), ((i, 284) for i in xrange(225, 236))):
+	for i,j in chain(((230, i) for i in range(279, 291)), ((i, 284) for i in range(225, 236))):
 		c = Counter()
 		neighbors = (
 			pixels[i-1,j-1],
@@ -527,16 +535,16 @@ def filter_aladin_old(src_img):
 	pending_bboxes = []
 	for min_x, max_x, min_y, max_y in bboxes:
 		c = Counter()
-		p_top = ((i, max_y+1) for i in xrange(min_x, max_x+1))
-		p_bottom = ((i, min_y-1) for i in xrange(min_x, max_x+1))
-		p_left = ((min_x-1, i) for i in xrange(min_y, max_y+1))
-		p_right = ((max_x+1, i) for i in xrange(min_y, max_y+1))
+		p_top = ((i, max_y+1) for i in range(min_x, max_x+1))
+		p_bottom = ((i, min_y-1) for i in range(min_x, max_x+1))
+		p_left = ((min_x-1, i) for i in range(min_y, max_y+1))
+		p_right = ((max_x+1, i) for i in range(min_y, max_y+1))
 		for x in chain(p_top, p_bottom, p_left, p_right):
 			c[pixels[x]] += 1
 		if len(c.most_common()) == 1:
 			the_color = c.most_common()[0][0]
-			for i in xrange(min_x, max_x+1):
-				for j in xrange(min_y, max_y+1):
+			for i in range(min_x, max_x+1):
+				for j in range(min_y, max_y+1):
 					pixels[i,j] = the_color
 		else:
 			print('simple fail')
@@ -719,23 +727,23 @@ class GeocodedRadar:
 	
 	def get_pixel_at_coords(self, lat, lng):
 		if self.transform is None:
-			return (0, 0), None
+			raise DataError()
 
-		yOrigin = self.transform[0]
-		xOrigin = self.transform[3]
-		pixelWidth = self.transform[1]
-		pixelHeight = self.transform[5]
+		y_origin = self.transform[0]
+		x_origin = self.transform[3]
+		pixel_width = self.transform[1]
+		pixel_height = self.transform[5]
 		
-		xOffset = abs(int((lat-xOrigin) / pixelWidth)) # XXX remove abs
-		yOffset = abs(int((lng-yOrigin) / pixelHeight))
+		x_offset = abs(int((lat-x_origin) / pixel_width)) # XXX remove abs
+		y_offset = abs(int((lng-y_origin) / pixel_height))
 		
 		try:
-			pixel = tuple((int(b[xOffset,yOffset]) for b in self.bands.itervalues()))
+			pixel = tuple((int(b[x_offset,y_offset]) for b in self.bands.values()))
 		except IndexError:
 			pixel = None
 
 		# x and y in these coordinates are switched for some reason?
-		return (yOffset, xOffset), pixel
+		return (y_offset, x_offset), pixel
 	
 	def get_rain_at_coords(self, lat, lng):
 		position, pixel = self.get_pixel_at_coords(lat, lng)
@@ -748,6 +756,7 @@ class GeocodedToca:
 	def __init__(self):
 		self.bands = {}
 		self.last_modified = None
+		self.transform = None
 	
 	def refresh(self):
 		toca = Toca.objects.all()
@@ -795,15 +804,17 @@ class GeocodedToca:
 			self.bands[i+1] = band.ReadAsArray(0, 0, self.cols, self.rows)
 	
 	def get_pixel_at_coords(self, lat, lng):
-		yOrigin = self.transform[0]
-		xOrigin = self.transform[3]
-		pixelWidth = self.transform[1]
-		pixelHeight = self.transform[5]
+		if self.transform is None:
+			raise DataError()
+		y_origin = self.transform[0]
+		x_origin = self.transform[3]
+		pixel_width = self.transform[1]
+		pixel_height = self.transform[5]
 		
-		xOffset = abs(int((lat-xOrigin) / pixelWidth)) # XXX remove abs
-		yOffset = abs(int((lng-yOrigin) / pixelHeight))
+		x_offset = abs(int((lat-x_origin) / pixel_width)) # XXX remove abs
+		y_offset = abs(int((lng-y_origin) / pixel_height))
 		
-		return (xOffset, yOffset), tuple((int(b[xOffset,yOffset]) for b in self.bands.itervalues()))
+		return (x_offset, y_offset), tuple((int(b[x_offset,y_offset]) for b in self.bands.values()))
 	
 	def get_toca_at_coords(self, lat, lng):
 		position, pixel = self.get_pixel_at_coords(lat, lng)
@@ -819,6 +830,7 @@ class GeocodedAladin:
 		self.bands = {}
 		self.tmpfiles = {}
 		self.forecast_time = {}
+		self.transform = None
 	
 	def refresh(self):
 		ft = self.forecast_time.get(6, datetime.datetime.now() - datetime.timedelta(1))
@@ -882,32 +894,34 @@ class GeocodedAladin:
 			self.forecast_time[n] = ft
 	
 	def _get_candidates(self, i, j):
-		for a in xrange(i-1, i+2):
-			for b in xrange(j-1, j+2):
+		for a in range(i-1, i+2):
+			for b in range(j-1, j+2):
 				yield a,b
 	
 	def get_pixel_at_coords(self, lat, lng):
-		yOrigin = self.transform[0]
-		xOrigin = self.transform[3]
-		pixelWidth = self.transform[1]
-		pixelHeight = self.transform[5]
+		if self.transform is None:
+			raise DataError()
+		y_origin = self.transform[0]
+		x_origin = self.transform[3]
+		pixel_width = self.transform[1]
+		pixel_height = self.transform[5]
 		
-		xOffset = abs(int((lat-xOrigin) / pixelWidth)) # XXX remove abs
-		yOffset = abs(int((lng-yOrigin) / pixelHeight))
+		x_offset = abs(int((lat-x_origin) / pixel_width)) # XXX remove abs
+		y_offset = abs(int((lng-y_origin) / pixel_height))
 		
 		resp = []
 		for n in self.bands:
-			candidates = self._get_candidates(xOffset, yOffset)
+			candidates = self._get_candidates(x_offset, y_offset)
 			c = Counter()
 			for p in candidates:
-				k = tuple((int(b[p]) for b in self.bands[n].itervalues()))
+				k = tuple((int(b[p]) for b in self.bands[n].values()))
 				c[k] += 1
-				if p == (xOffset, yOffset):
+				if p == (x_offset, y_offset):
 					c[k] += 5
 			resp.append((n, c.most_common()[0][0]))
-			#resp.append((n, tuple((int(b[xOffset,yOffset]) for b in self.bands[n].itervalues()))))
+			#resp.append((n, tuple((int(b[x_offset,y_offset]) for b in self.bands[n].values()))))
 		
-		return (xOffset, yOffset), list(sorted(resp))
+		return (x_offset, y_offset), list(sorted(resp))
 	
 	def _nearest_color(self, p, palette):
 		dists = []

@@ -6,6 +6,7 @@ class Command(BaseCommand):
 	def handle(self, *args, **options):
 		from arsoapi.models import Aladin, fetch_aladin
 		import datetime
+		import base64
 		
 		now = datetime.datetime.now()
 		hour = 0
@@ -24,7 +25,7 @@ class Command(BaseCommand):
 					a = Aladin.objects.get(forecast_time=ft, timedelta=n)
 					raise AlreadyProcessed()
 				except Aladin.DoesNotExist:
-					a = Aladin(timestamp=last_modified, forecast_time=ft, timedelta=n, picdata=img_data.encode('base64'))
+					a = Aladin(timestamp=last_modified, forecast_time=ft, timedelta=n, picdata=base64.b64encode(img_data))
 					a.save()
 					a.process()
 		except AlreadyProcessed:

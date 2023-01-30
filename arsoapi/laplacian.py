@@ -11,8 +11,8 @@ def _py_laplacian(im):
 	im2 = im.copy()
 	pix2 = im2.load()
 	
-	for i in xrange(1, im.size[0]-1):
-		for j in xrange(1, im.size[1]-1):
+	for i in range(1, im.size[0]-1):
+		for j in range(1, im.size[1]-1):
 			neigh4 = (
 				pix[i-1,j],
 				pix[i+1,j],
@@ -40,7 +40,7 @@ def _py_laplacian(im):
 			
 			by_color8 = zip(*neigh8)
 			new_pix = []
-			for x in xrange(3):
+			for x in range(3):
 				if (sum(by_color8[x]) - 8*p[x]) > 0:
 					new_pix.append(grad[x])
 				else:
@@ -52,8 +52,8 @@ def _py_laplacian(im):
 	im2 = im.copy()
 	pix2 = im2.load()
 	
-	for i in xrange(1, im.size[0]-1):
-		for j in xrange(1, im.size[1]-1):
+	for i in range(1, im.size[0]-1):
+		for j in range(1, im.size[1]-1):
 			
 			neigh8 = (
 				pix[i-1, j-1],
@@ -72,7 +72,7 @@ def _py_laplacian(im):
 			
 			new_p = []
 			
-			for x in xrange(3):
+			for x in range(3):
 				
 				if (p[x] <= 128) and any((n > 128 for n in by_color8[x])):
 					if p[x] >= 128:
@@ -110,12 +110,18 @@ else:
 		im.save(s, 'ppm')
 		ppm = s.getvalue()
 		del s
-		
-		header_match = re.match('^P6\n(\d+)\s(\d+)\n(\d+)\n', ppm, re.M)
-		header, raw_data = ppm[:header_match.end()], ppm[header_match.end():]
-		
+
+		identifier, sep, remains = ppm.partition(b'\n')
+		dimensions, sep, remains = remains.partition(b'\n')
+		depth, sep, raw_data = remains.partition(b'\n')
+
+		header = identifier + b'\n' + dimensions + b'\n' + depth + b'\n'
+
+		#header_match = re.match('^P6\n(\d+)\s(\d+)\n(\d+)\n', ppm, re.M)
+		#header, raw_data = ppm[:header_match.end()], ppm[header_match.end():]
+
 		result = _laplacian.ppm_laplacian(im.size, raw_data)
-		
+
 		s = BytesIO()
 		s.write(header)
 		s.write(result)

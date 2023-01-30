@@ -1,3 +1,4 @@
+import base64
 import glob
 import datetime
 import os
@@ -65,7 +66,7 @@ class TestVreme(unittest.TestCase):
 
 	def test01_radar(self):
 		img_data = open(datafile('test_sirad_si1_si2.gif')).read()
-		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
+		r = RadarPadavin(picdata=base64.b64encode(img_data), last_modified=datetime.datetime.now())
 		r.save()
 		r.process()
 
@@ -96,7 +97,7 @@ class TestVreme(unittest.TestCase):
 
 	def test01_radar_unknown_format(self):
 		img_data = open(datafile('test_invalid.gif')).read()
-		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
+		r = RadarPadavin(picdata=base64.b64encode(img_data), last_modified=datetime.datetime.now())
 		r.save()
 		r.process()
 
@@ -111,7 +112,7 @@ class TestVreme(unittest.TestCase):
 
 	def test01_radar_old_db(self):
 		img_data = open(datafile('test_sirad_si1_si2.gif')).read()
-		r = RadarPadavin(picdata=img_data.encode('base64'), last_modified=datetime.datetime.now())
+		r = RadarPadavin(picdata=base64.b64encode(img_data), last_modified=datetime.datetime.now())
 		r.save()
 		r.process()
 		r.format_id = None
@@ -135,7 +136,7 @@ class TestVreme(unittest.TestCase):
 			name = os.path.join("private", os.path.basename(path))
 
 			img_data = open(datafile(name)).read()
-			r = RadarPadavin(picdata=img_data.encode('base64'),
+			r = RadarPadavin(picdata=base64.b64encode(img_data),
 					last_modified=datetime.datetime.now())
 			r.save()
 			r.process()
@@ -143,8 +144,8 @@ class TestVreme(unittest.TestCase):
 			gr = GeocodedRadar()
 			gr.load_from_model(r)
 
-			for lat in xrange(45210, 47050+1, 10):
-				for lon in xrange(12920, 16710+1, 10):
+			for lat in range(45210, 47050+1, 10):
+				for lon in range(12920, 16710+1, 10):
 					lat_f = lat * 1e-3
 					lon_f = lon * 1e-3
 					pos, rain_mmph = gr.get_rain_at_coords(lat_f, lon_f)
@@ -167,7 +168,8 @@ class TestVreme(unittest.TestCase):
 				date=today,
 				last_modified=datetime.datetime.now(),
 				timedelta=n,
-				picdata=img_data.encode('base64'))
+				picdata=base64.b64encode(img_data),
+			)
 			a.save()
 		
 		aladini = Aladin.objects.filter(date=today)

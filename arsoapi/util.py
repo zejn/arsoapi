@@ -10,7 +10,7 @@ class Counter(dict):
 		return 0
 	
 	def most_common(self, n=None):
-		return sorted(self.iteritems(), key=_itemgetter(1), reverse=True)
+		return sorted(self.items(), key=_itemgetter(1), reverse=True)
 
 def _parse_http_datetime(s):
 	return datetime(*parsedate(s)[:6])

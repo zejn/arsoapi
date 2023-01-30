@@ -17,6 +17,7 @@ from arsoapi.models import (
 	RadarPadavin, Toca, Aladin,
 	mmph_to_level,
 	annotate_geo_radar,
+	DataError,
 	)
 from arsoapi.formats import radar_get_format
 
@@ -240,7 +241,7 @@ def report(request):
 	try:
 		lat = float(request.GET.get('lat'))
 		lon = float(request.GET.get('lon'))
-	except:
+	except Exception:
 		return {
 			'status': 'fail',
 			'error': 'Invalid parameters.'
@@ -252,42 +253,80 @@ def report(request):
 			'error': 'Coordinates out of bounds.'
 			}
 	else:
-		posR, rain_mmph = geocoded_radar.get_rain_at_coords(lat, lon)
-		posT, toca_level = geocoded_toca.get_toca_at_coords(lat, lon)
-		posA, forecast = geocoded_aladin.get_forecast_at_coords(lat, lon)
-		
-		utc_diff = tz2utc_diff()
-		
-		resp = {
-			'status': 'ok',
+		response = {
 			'lat': request.GET.get('lat'),
 			'lon': request.GET.get('lon'),
 			'copyright': u'ARSO, Agencija RS za okolje',
-			'radar': {
-				'updated': _datetime2timestamp(geocoded_radar.last_modified + utc_diff),
-				'updated_text': (geocoded_radar.last_modified + utc_diff).strftime('%Y-%m-%d %H:%M'),
+			'status': 'ok',
+		}
+
+		utc_diff = tz2utc_diff()
+
+		def datetime2timestamp(dt_or_none, utc_diff):
+			if dt_or_none is None:
+				return None
+			return _datetime2timestamp(dt_or_none + utc_diff)
+
+		def datetime2text(dt_or_none, utc_diff):
+			if dt_or_none is None:
+				return None
+			return (dt_or_none + utc_diff).strftime('%Y-%m-%d %H:%M')
+
+		try:
+			posR, rain_mmph = geocoded_radar.get_rain_at_coords(lat, lon)
+		except DataError:
+			response["radar"] = {
+				"updated": None,
+				"updated_text": None,
+				"x": None,
+				"y": None,
+				"rain_level": None,
+				"raim_mmph": None,
+			}
+		else:
+			response['radar'] = {
+				'updated': datetime2timestamp(geocoded_radar.last_modified, utc_diff),
+				'updated_text': datetime2text(geocoded_radar.last_modified, utc_diff),
 				'x': posR[0],
 				'y': posR[1],
 				'rain_level': mmph_to_level(rain_mmph),
 				'rain_mmph': rain_mmph,
-			},
-			'hailprob': {
-				'updated': _datetime2timestamp(geocoded_toca.last_modified + utc_diff),
-				'updated_text': (geocoded_toca.last_modified + utc_diff).strftime('%Y-%m-%d %H:%M'),
+			}
+
+		try:
+			posT, toca_level = geocoded_toca.get_toca_at_coords(lat, lon)
+		except DataError:
+			response["hailprob"] = {
+				"updated": None,
+				"updated_text": None,
+				"x": None,
+				"y": None,
+				"hail_level": None,
+			}
+		else:
+			response['hailprob'] = {
+				'updated': datetime2timestamp(geocoded_toca.last_modified, utc_diff),
+				'updated_text': datetime2text(geocoded_toca.last_modified, utc_diff),
 				'x': posT[0],
 				'y': posT[1],
 				'hail_level': toca_level,
-			},
-			'forecast': {
+			}
+
+		try:
+			posA, forecast = geocoded_aladin.get_forecast_at_coords(lat, lon)
+		except DataError:
+			response["forecast"] = {
+				"updated": None,
+				"x": None,
+				"y": None,
+				"data": None,
+			}
+		else:
+			response['forecast'] = {
 				'updated': _datetime2timestamp(geocoded_aladin.forecast_time.get(6, None)),
 				'x': posA[0],
 				'y': posA[1],
 				'data': forecast,
 			}
-		}
-		return resp
 
-
-
-
-
+		return response

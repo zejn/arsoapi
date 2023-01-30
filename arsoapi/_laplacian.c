@@ -272,10 +272,14 @@ PyObject * ppm_laplacian(PyObject *self, PyObject * args)
 	destPR = malloc(datasize);
 	srcPR = malloc(datasize);
 	memcpy(srcPR, data, datasize);
-	
+
+	dprint("calling laplace");
 	laplace(width, height, srcPR, destPR);
-	
-	result = Py_BuildValue("s#", destPR, datasize);
+
+	dprint("building result");
+	result = Py_BuildValue("y#", destPR, datasize);
+
+	dprint("returning laplace result");
 	return result;
 }
 
