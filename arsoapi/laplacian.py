@@ -90,7 +90,7 @@ def _py_laplacian(im):
 
 
 try:
-	import _laplacian
+	from arsoapi import _laplacian
 	_laplacian.ppm_laplacian # this is foo!
 
 except (ImportError, AttributeError) as e:
