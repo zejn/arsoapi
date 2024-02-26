@@ -704,8 +704,8 @@ class GeocodedRadar:
 		self.clean()
 	
 	def clean(self):
-		for b in self.bands.keys():
-			del self.bands[b]
+		while self.bands.keys():
+			del self.bands[self.bands.keys()[0]]
 		self.transform = None
 		self.rows = self.cols = None
 		self.ds = None
